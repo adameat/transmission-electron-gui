@@ -1,0 +1,43 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Transmission Electron GUI",
+			"type": "shell",
+			"command": "C:\\Users\\xeno\\AppData\\Local\\Programs\\nodejs\\npm.cmd",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"options": {
+				"env": {
+					"PATH": "C:\\Users\\xeno\\AppData\\Local\\Programs\\nodejs;C:\\Users\\xeno\\AppData\\Local\\Programs\\MinGit\\cmd;${env:PATH}",
+					"Path": "C:\\Users\\xeno\\AppData\\Local\\Programs\\nodejs;C:\\Users\\xeno\\AppData\\Local\\Programs\\MinGit\\cmd;${env:Path}"
+				}
+			},
+			"group": "build"
+		},
+		{
+			"label": "Dev Transmission Electron GUI",
+			"type": "shell",
+			"command": "C:\\Users\\xeno\\AppData\\Local\\Programs\\nodejs\\npm.cmd",
+			"args": [
+				"run",
+				"dev"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"options": {
+				"env": {
+					"PATH": "C:\\Users\\xeno\\AppData\\Local\\Programs\\nodejs;C:\\Users\\xeno\\AppData\\Local\\Programs\\MinGit\\cmd;${env:PATH}",
+					"Path": "C:\\Users\\xeno\\AppData\\Local\\Programs\\nodejs;C:\\Users\\xeno\\AppData\\Local\\Programs\\MinGit\\cmd;${env:Path}"
+				}
+			},
+			"group": "build"
+		}
+	]
+}
