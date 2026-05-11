@@ -14,6 +14,7 @@ The original Pascal/Lazarus Transmission Remote GUI project was used as workflow
 - Saved connection profiles with automatic reconnect on startup and profile switch.
 - Transmission RPC client with `X-Transmission-Session-Id` retry handling.
 - Basic authentication support for RPC connections.
+- Connection profile passwords encrypted at rest with Electron `safeStorage` when OS encryption is available.
 - Torrent grid with filters, search, progress, rates, ratio, ETA, peer count, sortable columns, and persisted column widths.
 - Toolbar actions for add, start, stop, remove, verify, reannounce, and refresh.
 - Add torrent dialog for magnet links, URLs, bare info hashes, and local `.torrent` files.
@@ -70,6 +71,6 @@ The installer is written to `release/` and is intended to be published as a GitH
 
 ## Notes
 
-Passwords entered into profiles are stored in the local Electron settings JSON for this first version. Before sharing or packaging the app, move secrets into the OS credential store.
+Passwords entered into profiles are encrypted before being written to the local Electron settings JSON when Electron `safeStorage` can use the OS encryption backend. If that backend is unavailable, the app preserves profile usability by falling back to plaintext storage and logging a warning.
 
 No license has been selected yet.

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
@@ -34,11 +34,55 @@ const defaultProfile: TransmissionProfile = {
 
 const torrentColumnKeys = new Set(['name', 'size', 'done', 'status', 'down', 'up', 'eta', 'ratio', 'peers', 'added']);
 
+type StoredTransmissionProfile = Omit<TransmissionProfile, 'password'> & {
+  password?: string;
+  encryptedPassword?: string;
+};
+
+type StoredAppSettings = Omit<AppSettings, 'profiles'> & {
+  profiles: StoredTransmissionProfile[];
+};
+
 function settingsPath(): string {
   return path.join(app.getPath('userData'), 'settings.json');
 }
 
-function normalizeProfile(profile: Partial<TransmissionProfile>): TransmissionProfile {
+function decryptStoredPassword(profile: Partial<StoredTransmissionProfile>): string {
+  if (!profile.encryptedPassword) {
+    return profile.password || '';
+  }
+
+  if (!safeStorage.isEncryptionAvailable()) {
+    console.warn('Profile password could not be decrypted because OS password encryption is unavailable.');
+    return profile.password || '';
+  }
+
+  try {
+    return safeStorage.decryptString(Buffer.from(profile.encryptedPassword, 'base64'));
+  } catch (error) {
+    console.warn('Unable to decrypt stored profile password:', error);
+    return profile.password || '';
+  }
+}
+
+function encryptStoredPassword(password: string): Pick<StoredTransmissionProfile, 'password' | 'encryptedPassword'> {
+  if (!password) {
+    return {};
+  }
+
+  if (safeStorage.isEncryptionAvailable()) {
+    try {
+      return { encryptedPassword: safeStorage.encryptString(password).toString('base64') };
+    } catch (error) {
+      console.warn('Unable to encrypt profile password:', error);
+    }
+  }
+
+  console.warn('OS password encryption is unavailable; storing profile password in plaintext.');
+  return { password };
+}
+
+function normalizeProfile(profile: Partial<StoredTransmissionProfile>): TransmissionProfile {
   return {
     id: profile.id || randomUUID(),
     name: profile.name?.trim() || 'Transmission daemon',
@@ -47,11 +91,11 @@ function normalizeProfile(profile: Partial<TransmissionProfile>): TransmissionPr
     port: Number(profile.port) || 9091,
     rpcPath: profile.rpcPath?.startsWith('/') ? profile.rpcPath : `/${profile.rpcPath || 'transmission/rpc'}`,
     username: profile.username || '',
-    password: profile.password || ''
+    password: decryptStoredPassword(profile)
   };
 }
 
-function normalizeSettings(settings: Partial<AppSettings>): AppSettings {
+function normalizeSettings(settings: Partial<StoredAppSettings>): AppSettings {
   const profiles = settings.profiles?.length
     ? settings.profiles.map((profile) => normalizeProfile(profile))
     : [defaultProfile];
@@ -77,10 +121,42 @@ function normalizeSettings(settings: Partial<AppSettings>): AppSettings {
   };
 }
 
+function serializeProfile(profile: TransmissionProfile): StoredTransmissionProfile {
+  const normalizedProfile = normalizeProfile(profile);
+  const { password, ...profileWithoutPassword } = normalizedProfile;
+  return {
+    ...profileWithoutPassword,
+    ...encryptStoredPassword(password)
+  };
+}
+
+function serializeSettings(settings: AppSettings): StoredAppSettings {
+  const normalizedSettings = normalizeSettings(settings);
+  return {
+    ...normalizedSettings,
+    profiles: normalizedSettings.profiles.map((profile) => serializeProfile(profile))
+  };
+}
+
+function hasPlaintextPasswords(settings: Partial<StoredAppSettings>): boolean {
+  return Boolean(settings.profiles?.some((profile) => profile.password));
+}
+
 async function readSettings(): Promise<AppSettings> {
   try {
     const raw = await fs.readFile(settingsPath(), 'utf8');
-    return normalizeSettings(JSON.parse(raw) as Partial<AppSettings>);
+    const storedSettings = JSON.parse(raw) as Partial<StoredAppSettings>;
+    const settings = normalizeSettings(storedSettings);
+
+    if (hasPlaintextPasswords(storedSettings) && safeStorage.isEncryptionAvailable()) {
+      try {
+        await writeSettings(settings);
+      } catch (migrationError) {
+        console.warn('Unable to migrate plaintext profile passwords:', migrationError);
+      }
+    }
+
+    return settings;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
       console.warn('Unable to read settings:', error);
@@ -92,8 +168,9 @@ async function readSettings(): Promise<AppSettings> {
 
 async function writeSettings(settings: AppSettings): Promise<AppSettings> {
   const nextSettings = normalizeSettings(settings);
+  const storedSettings = serializeSettings(nextSettings);
   await fs.mkdir(path.dirname(settingsPath()), { recursive: true });
-  await fs.writeFile(settingsPath(), `${JSON.stringify(nextSettings, null, 2)}\n`, 'utf8');
+  await fs.writeFile(settingsPath(), `${JSON.stringify(storedSettings, null, 2)}\n`, 'utf8');
   return nextSettings;
 }
 
