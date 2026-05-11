@@ -17,6 +17,8 @@
     "dev": "electron-vite dev",
     "build": "tsc --noEmit && electron-vite build",
     "dist:win": "npm run build && electron-builder --win nsis --x64",
+    "dist:mac": "npm run build && electron-builder --mac dmg zip --x64 --arm64",
+    "dist:linux": "npm run build && electron-builder --linux AppImage deb --x64",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit"
   },
@@ -41,6 +43,45 @@
           ]
         }
       ]
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "identity": null,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "Transmission-Electron-GUI-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "category": "Network",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Transmission-Electron-GUI-${version}-${arch}.${ext}"
     },
     "nsis": {
       "artifactName": "Transmission-Electron-GUI-Setup-${version}-${arch}.${ext}",

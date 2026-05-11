@@ -69,6 +69,26 @@ npm.cmd run dist:win
 
 The installer is written to `release/` and is intended to be published as a GitHub Release asset. The current installer is unsigned, so Windows may show an unknown-publisher warning.
 
+## macOS And Ubuntu Packages
+
+Build unsigned macOS packages on macOS:
+
+```bash
+npm run dist:mac
+```
+
+This writes `.dmg` and `.zip` packages for Intel and Apple Silicon Macs to `release/`. Without Apple Developer ID signing and notarization, macOS Gatekeeper may warn before opening the app.
+
+Build Ubuntu/Linux packages on Linux:
+
+```bash
+npm run dist:linux
+```
+
+This writes an x64 `.AppImage` and `.deb` package to `release/`.
+
+GitHub Actions builds Windows, macOS, and Ubuntu packages from `.github/workflows/release.yml`. Manual workflow runs upload build artifacts, and pushing a tag like `v0.1.1` publishes those artifacts to the matching GitHub Release.
+
 ## Notes
 
 Passwords entered into profiles are encrypted before being written to the local Electron settings JSON when Electron `safeStorage` can use the OS encryption backend. If that backend is unavailable, the app preserves profile usability by falling back to plaintext storage and logging a warning.
