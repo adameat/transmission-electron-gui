@@ -43,7 +43,7 @@
       ]
     },
     "nsis": {
-      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
+      "artifactName": "Transmission-Electron-GUI-Setup-${version}-${arch}.${ext}",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
