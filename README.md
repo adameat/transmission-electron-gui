@@ -58,6 +58,16 @@ npm.cmd run start
 npm.cmd run build
 ```
 
+## Windows Installer
+
+Build a Windows x64 installer with Electron Builder:
+
+```powershell
+npm.cmd run dist:win
+```
+
+The installer is written to `release/` and is intended to be published as a GitHub Release asset. The current installer is unsigned, so Windows may show an unknown-publisher warning.
+
 ## Notes
 
 Passwords entered into profiles are stored in the local Electron settings JSON for this first version. Before sharing or packaging the app, move secrets into the OS credential store.
