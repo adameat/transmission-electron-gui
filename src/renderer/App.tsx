@@ -105,7 +105,7 @@ function compareTorrents(firstTorrent: Torrent, secondTorrent: Torrent, sort: To
 
 function transmissionApi(): Window['transmission'] {
   if (!window.transmission) {
-    throw new Error('Electron bridge is unavailable. Restart the app from .\\dev.cmd so the preload script is loaded.');
+    throw new Error('Desktop integration failed to start. Please restart the application.');
   }
 
   return window.transmission;
