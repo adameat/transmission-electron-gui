@@ -108,10 +108,12 @@ export function TorrentTable({ torrents, selectedId, sort, columnWidths, onSelec
               </td>
               <td>{formatBytes(torrent.sizeWhenDone || torrent.totalSize)}</td>
               <td className="progress-cell">
-                <div className="progress-track" aria-label={formatPercent(torrent.percentDone)}>
-                  <span style={{ width: formatPercent(torrent.percentDone) }} />
+                <div className="progress-content">
+                  <div className="progress-track" aria-label={formatPercent(torrent.percentDone)}>
+                    <span style={{ width: formatPercent(torrent.percentDone) }} />
+                  </div>
+                  <em>{formatPercent(torrent.percentDone)}</em>
                 </div>
-                <em>{formatPercent(torrent.percentDone)}</em>
               </td>
               <td>{statusText(torrent)}</td>
               <td>{formatRate(torrent.rateDownload)}</td>
