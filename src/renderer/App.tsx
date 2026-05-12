@@ -13,6 +13,7 @@ import type {
   TransmissionProfile,
   TransmissionSession
 } from '@shared/types';
+import { collectDownloadDirs, maxTorrentDownloadDirSuggestionScan } from '@shared/downloadDirs';
 import { AddTorrentDialog, type AddTorrentPayload, type AddTorrentProgress } from './components/AddTorrentDialog';
 import { ConnectionBar } from './components/ConnectionBar';
 import { ConnectionSettingsDialog } from './components/ConnectionSettingsDialog';
@@ -44,7 +45,8 @@ const defaultSettings: AppSettings = {
     key: 'name',
     direction: 'asc'
   },
-  torrentColumnWidths: {}
+  torrentColumnWidths: {},
+  recentDownloadDirs: []
 };
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
@@ -55,6 +57,8 @@ interface RefreshOptions {
   showProgress?: boolean;
   label?: string;
 }
+
+type SettingsUpdate = AppSettings | ((currentSettings: AppSettings) => AppSettings);
 
 function waitForProgressFrame(): Promise<void> {
   return new Promise((resolve) => {
@@ -136,6 +140,52 @@ function transmissionApi(): Window['transmission'] {
   return window.transmission;
 }
 
+function* downloadDirSuggestionSources(
+  defaultDownloadDir: string,
+  recentDownloadDirs: string[],
+  torrents: Torrent[],
+  sessionDefaultDownloadDir: string
+): Generator<string | undefined> {
+  yield defaultDownloadDir;
+  yield* recentDownloadDirs;
+
+  // Recent folders are the high-confidence source; current torrents are a fallback, so cap the scan to keep render work predictable.
+  let scannedTorrents = 0;
+  for (const torrent of torrents) {
+    if (scannedTorrents >= maxTorrentDownloadDirSuggestionScan) {
+      break;
+    }
+
+    scannedTorrents += 1;
+    yield torrent.downloadDir;
+  }
+
+  yield sessionDefaultDownloadDir;
+}
+
+function sameDownloadDirs(firstDownloadDirs: string[], secondDownloadDirs: string[]): boolean {
+  return (
+    firstDownloadDirs.length === secondDownloadDirs.length &&
+    firstDownloadDirs.every((downloadDir, index) => downloadDir === secondDownloadDirs[index])
+  );
+}
+
+function sameTorrentSort(firstSort: TorrentSortSettings, secondSort: TorrentSortSettings): boolean {
+  return firstSort.key === secondSort.key && firstSort.direction === secondSort.direction;
+}
+
+function sameColumnWidths(firstColumnWidths: TorrentColumnWidths, secondColumnWidths: TorrentColumnWidths): boolean {
+  const firstKeys = Object.keys(firstColumnWidths) as TorrentSortKey[];
+  const secondKeys = Object.keys(secondColumnWidths) as TorrentSortKey[];
+
+  return (
+    firstKeys.length === secondKeys.length &&
+    firstKeys.every(
+      (columnKey) => Object.prototype.hasOwnProperty.call(secondColumnWidths, columnKey) && firstColumnWidths[columnKey] === secondColumnWidths[columnKey]
+    )
+  );
+}
+
 export default function App(): JSX.Element {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [profile, setProfile] = useState<TransmissionProfile>(defaultProfile);
@@ -155,6 +205,11 @@ export default function App(): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [statusActivity, setStatusActivity] = useState<StatusActivity>('idle');
   const [message, setMessage] = useState('Ready');
+  const settingsRef = useRef<AppSettings>(defaultSettings);
+  const persistedSettingsRef = useRef<AppSettings>(defaultSettings);
+  const sortRef = useRef<TorrentSortSettings>(defaultSettings.torrentSort);
+  const columnWidthsRef = useRef<TorrentColumnWidths>(defaultSettings.torrentColumnWidths);
+  const settingsSaveQueue = useRef<Promise<void>>(Promise.resolve());
   const autoConnectStarted = useRef(false);
   const connectionRunId = useRef(0);
 
@@ -164,11 +219,76 @@ export default function App(): JSX.Element {
     return transmissionApi().request<TArguments>({ method, arguments: args });
   }, []);
 
-  const saveSettings = useCallback(async (nextSettings: AppSettings): Promise<AppSettings> => {
-    const savedSettings = await transmissionApi().saveSettings(nextSettings);
-    setSettings(savedSettings);
-    return savedSettings;
+  const applySort = useCallback((nextSort: TorrentSortSettings): void => {
+    sortRef.current = nextSort;
+    setSort(nextSort);
   }, []);
+
+  const applyColumnWidths = useCallback((nextColumnWidths: TorrentColumnWidths): void => {
+    columnWidthsRef.current = nextColumnWidths;
+    setColumnWidths(nextColumnWidths);
+  }, []);
+
+  const applySettings = useCallback((settingsUpdate: SettingsUpdate): AppSettings => {
+    const nextSettings = typeof settingsUpdate === 'function' ? settingsUpdate(settingsRef.current) : settingsUpdate;
+    if (nextSettings === settingsRef.current) {
+      return nextSettings;
+    }
+
+    settingsRef.current = nextSettings;
+    setSettings(nextSettings);
+    return nextSettings;
+  }, []);
+
+  const applyMirroredSettings = useCallback(
+    (expectedSettings: AppSettings, nextSettings: AppSettings): void => {
+      const shouldMirrorSort = sortRef.current === expectedSettings.torrentSort && !sameTorrentSort(sortRef.current, nextSettings.torrentSort);
+      const shouldMirrorColumnWidths =
+        columnWidthsRef.current === expectedSettings.torrentColumnWidths && !sameColumnWidths(columnWidthsRef.current, nextSettings.torrentColumnWidths);
+
+      if (shouldMirrorSort) {
+        applySort(nextSettings.torrentSort);
+      }
+
+      if (shouldMirrorColumnWidths) {
+        applyColumnWidths(nextSettings.torrentColumnWidths);
+      }
+    },
+    [applyColumnWidths, applySort]
+  );
+
+  const saveSettings = useCallback(async (nextSettings: AppSettings): Promise<AppSettings> => {
+    const pendingSettings = applySettings(nextSettings);
+
+    // Serialize writes so an older settings save cannot finish after a newer one and leave stale data on disk.
+    const saveOperation = settingsSaveQueue.current.then(() => transmissionApi().saveSettings(pendingSettings));
+    settingsSaveQueue.current = saveOperation.then(
+      () => undefined,
+      () => undefined
+    );
+
+    try {
+      const savedSettings = await saveOperation;
+      persistedSettingsRef.current = savedSettings;
+
+      // Settings writes can overlap; only apply the normalized response if this save is still the latest local settings object.
+      if (settingsRef.current === pendingSettings) {
+        const appliedSettings = applySettings(savedSettings);
+        applyMirroredSettings(pendingSettings, appliedSettings);
+        return appliedSettings;
+      }
+
+      return settingsRef.current;
+    } catch (error) {
+      if (settingsRef.current === pendingSettings) {
+        const persistedSettings = persistedSettingsRef.current;
+        applySettings(persistedSettings);
+        applyMirroredSettings(pendingSettings, persistedSettings);
+      }
+
+      throw error;
+    }
+  }, [applyMirroredSettings, applySettings]);
 
   const refresh = useCallback(async (options: boolean | RefreshOptions = {}): Promise<void> => {
     const force = typeof options === 'boolean' ? options : Boolean(options.force);
@@ -239,18 +359,19 @@ export default function App(): JSX.Element {
       .loadSettings()
       .then((loadedSettings) => {
         const loadedProfile = loadedSettings.profiles.find((savedProfile) => savedProfile.id === loadedSettings.activeProfileId) ?? loadedSettings.profiles[0];
-        setSettings(loadedSettings);
-        setSort(loadedSettings.torrentSort);
-        setColumnWidths(loadedSettings.torrentColumnWidths);
+        persistedSettingsRef.current = loadedSettings;
+        applySettings(loadedSettings);
+        applySort(loadedSettings.torrentSort);
+        applyColumnWidths(loadedSettings.torrentColumnWidths);
         setProfile(loadedProfile);
 
         if (!autoConnectStarted.current) {
           autoConnectStarted.current = true;
-          connectToProfile(loadedProfile, loadedSettings).catch((error) => setMessage(errorMessage(error)));
+          connectToProfile(loadedProfile).catch((error) => setMessage(errorMessage(error)));
         }
       })
       .catch((error) => setMessage(errorMessage(error)));
-  }, []);
+  }, [applyColumnWidths, applySettings, applySort]);
 
   useEffect(() => {
     if (!connected || !selectedId) {
@@ -292,40 +413,54 @@ export default function App(): JSX.Element {
   );
 
   const counts = useMemo(() => countFilters(torrents), [torrents]);
+  const sessionDefaultDownloadDir = String(session?.['download-dir'] ?? '');
+  const defaultAddDownloadDir = useMemo(
+    () => collectDownloadDirs([...(settings.recentDownloadDirs ?? []), sessionDefaultDownloadDir])[0] ?? '',
+    [settings.recentDownloadDirs, sessionDefaultDownloadDir]
+  );
+  const downloadDirSuggestions = useMemo(
+    () => {
+      const downloadDirSources = downloadDirSuggestionSources(
+        defaultAddDownloadDir,
+        settings.recentDownloadDirs ?? [],
+        torrents,
+        sessionDefaultDownloadDir
+      );
+      return collectDownloadDirs(downloadDirSources);
+    },
+    [defaultAddDownloadDir, settings.recentDownloadDirs, sessionDefaultDownloadDir, torrents]
+  );
 
   function changeSort(sortKey: TorrentSortKey): void {
     const nextSort: TorrentSortSettings = {
       key: sortKey,
       direction: sort.key === sortKey && sort.direction === 'asc' ? 'desc' : 'asc'
     };
-    const nextSettings = { ...settings, torrentSort: nextSort };
+    const nextSettings = { ...settingsRef.current, torrentSort: nextSort };
 
-    setSort(nextSort);
-    setSettings(nextSettings);
+    applySort(nextSort);
     saveSettings(nextSettings).catch((error) => setMessage(errorMessage(error)));
   }
 
   function changeColumnWidth(sortKey: TorrentSortKey, width: number, commit: boolean): void {
-    const nextColumnWidths = { ...columnWidths, [sortKey]: Math.round(width) };
-    setColumnWidths(nextColumnWidths);
+    const nextColumnWidths = { ...columnWidthsRef.current, [sortKey]: Math.round(width) };
+    applyColumnWidths(nextColumnWidths);
 
     if (!commit) {
       return;
     }
 
-    const nextSettings = { ...settings, torrentColumnWidths: nextColumnWidths };
-    setSettings(nextSettings);
+    const nextSettings = { ...settingsRef.current, torrentColumnWidths: nextColumnWidths };
     saveSettings(nextSettings).catch((error) => setMessage(errorMessage(error)));
   }
 
   async function selectProfile(profileId: string): Promise<void> {
-    const savedProfile = settings.profiles.find((candidate) => candidate.id === profileId);
+    const savedProfile = settingsRef.current.profiles.find((candidate) => candidate.id === profileId);
     if (savedProfile) {
       setProfile(savedProfile);
-      const nextSettings = { ...settings, activeProfileId: profileId };
-      setSettings(nextSettings);
+      const nextSettings = { ...settingsRef.current, activeProfileId: profileId };
       await saveSettings(nextSettings);
-      await switchToProfile(savedProfile, nextSettings);
+      await switchToProfile(savedProfile);
     }
   }
 
@@ -338,7 +473,7 @@ export default function App(): JSX.Element {
     setSelectedDetail(null);
   }
 
-  async function connectToProfile(targetProfile: TransmissionProfile, settingsForSave = settings): Promise<void> {
+  async function connectToProfile(targetProfile: TransmissionProfile): Promise<void> {
     const requestId = connectionRunId.current + 1;
     connectionRunId.current = requestId;
     setBusy(true);
@@ -355,6 +490,7 @@ export default function App(): JSX.Element {
       setProfile(result.profile);
       setSession(result.session);
       setStats(result.stats);
+      const settingsForSave = settingsRef.current;
       await saveSettings({
         ...settingsForSave,
         activeProfileId: result.profile.id,
@@ -374,36 +510,36 @@ export default function App(): JSX.Element {
     }
   }
 
-  async function switchToProfile(targetProfile: TransmissionProfile, nextSettings = settings): Promise<void> {
+  async function switchToProfile(targetProfile: TransmissionProfile): Promise<void> {
     setMessage(`Switching to ${targetProfile.name}...`);
     if (connected) {
       await transmissionApi().disconnect();
       clearConnectionData();
     }
 
-    await connectToProfile(targetProfile, nextSettings);
+    await connectToProfile(targetProfile);
   }
 
   async function saveProfiles(profiles: TransmissionProfile[]): Promise<void> {
+    const currentSettings = settingsRef.current;
     const normalizedProfiles = profiles.map(ensureProfile);
-    const nextActiveProfileId = normalizedProfiles.some((savedProfile) => savedProfile.id === settings.activeProfileId)
-      ? settings.activeProfileId
+    const nextActiveProfileId = normalizedProfiles.some((savedProfile) => savedProfile.id === currentSettings.activeProfileId)
+      ? currentSettings.activeProfileId
       : normalizedProfiles[0].id;
-    const previousActiveProfile = settings.profiles.find((savedProfile) => savedProfile.id === settings.activeProfileId);
+    const previousActiveProfile = currentSettings.profiles.find((savedProfile) => savedProfile.id === currentSettings.activeProfileId);
     const nextActiveProfile = normalizedProfiles.find((savedProfile) => savedProfile.id === nextActiveProfileId) ?? normalizedProfiles[0];
     const activeProfileChanged = JSON.stringify(previousActiveProfile) !== JSON.stringify(nextActiveProfile);
 
-    const nextSettings = await saveSettings({
-      ...settings,
+    await saveSettings({
+      ...currentSettings,
       activeProfileId: nextActiveProfileId,
       profiles: normalizedProfiles
     });
 
-    setSettings(nextSettings);
     setProfile(nextActiveProfile);
 
     if (connected && activeProfileChanged) {
-      await switchToProfile(nextActiveProfile, nextSettings);
+      await switchToProfile(nextActiveProfile);
       return;
     }
 
@@ -411,7 +547,7 @@ export default function App(): JSX.Element {
   }
 
   async function connect(): Promise<void> {
-    await connectToProfile(profile, settings);
+    await connectToProfile(profile);
   }
 
   async function refreshNow(): Promise<void> {
@@ -430,6 +566,20 @@ export default function App(): JSX.Element {
     await transmissionApi().disconnect();
     clearConnectionData();
     setMessage('Disconnected');
+  }
+
+  function rememberDownloadDir(downloadDir?: string): void {
+    const currentSettings = settingsRef.current;
+    // Add completes after an RPC await, so merge against the latest settings ref instead of the render's older snapshot.
+    const recentDownloadDirs = collectDownloadDirs([downloadDir, ...(currentSettings.recentDownloadDirs ?? [])]);
+    if (sameDownloadDirs(recentDownloadDirs, currentSettings.recentDownloadDirs ?? [])) {
+      return;
+    }
+
+    const nextSettings = { ...currentSettings, recentDownloadDirs };
+    saveSettings(nextSettings)
+      // The torrent has already been accepted at this point, so a settings-write failure should be reported without turning add into an error.
+      .catch((error) => setMessage(`Torrent added, but saving recent folder failed: ${errorMessage(error)}`));
   }
 
   async function runTorrentAction(method: string, args: Record<string, unknown> = {}, reloadDetails = true): Promise<void> {
@@ -510,6 +660,9 @@ export default function App(): JSX.Element {
       if (!addedTorrent) {
         throw new Error('Transmission accepted the request but did not report an added torrent.');
       }
+
+      // When no folder is sent, Transmission applies the session default; remember that effective path instead of keeping an older custom default.
+      rememberDownloadDir(payload.downloadDir || sessionDefaultDownloadDir || undefined);
 
       try {
         reportProgress('Refreshing torrent list...');
@@ -626,7 +779,14 @@ export default function App(): JSX.Element {
         onClose={() => setConnectionsOpen(false)}
         onSave={saveProfiles}
       />
-      <AddTorrentDialog open={addOpen} busy={busy} defaultDownloadDir={String(session?.['download-dir'] ?? '')} onClose={() => setAddOpen(false)} onSubmit={addTorrent} />
+      <AddTorrentDialog
+        open={addOpen}
+        busy={busy}
+        defaultDownloadDir={defaultAddDownloadDir}
+        downloadDirSuggestions={downloadDirSuggestions}
+        onClose={() => setAddOpen(false)}
+        onSubmit={addTorrent}
+      />
     </div>
   );
 }

@@ -17,6 +17,7 @@ export interface AppSettings {
   refreshIntervalSeconds: number;
   torrentSort: TorrentSortSettings;
   torrentColumnWidths: TorrentColumnWidths;
+  recentDownloadDirs: string[];
 }
 
 export type SortDirection = 'asc' | 'desc';

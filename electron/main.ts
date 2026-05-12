@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normalizeDownloadDirs } from '../src/shared/downloadDirs';
 import type {
   AppSettings,
   ConnectionResult,
@@ -118,7 +119,8 @@ function normalizeSettings(settings: Partial<StoredAppSettings>): AppSettings {
       key: settings.torrentSort?.key || 'name',
       direction: settings.torrentSort?.direction === 'desc' ? 'desc' : 'asc'
     },
-    torrentColumnWidths
+    torrentColumnWidths,
+    recentDownloadDirs: normalizeDownloadDirs(settings.recentDownloadDirs)
   };
 }
 
