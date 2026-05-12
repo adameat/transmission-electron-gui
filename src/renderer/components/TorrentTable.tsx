@@ -1,5 +1,6 @@
+import { useMemo, type MouseEvent as ReactMouseEvent } from 'react';
 import type { Torrent, TorrentColumnWidths, TorrentSortSettings, TorrentSortKey } from '@shared/types';
-import { formatBytes, formatDate, formatDuration, formatPercent, formatRate, formatRatio, statusText } from '../utils';
+import { byteUnitIndexForValue, formatBytes, formatDate, formatDuration, formatPercent, formatRate, formatRatio, statusText, torrentListSize } from '../utils';
 
 interface TorrentTableProps {
   torrents: Torrent[];
@@ -11,18 +12,23 @@ interface TorrentTableProps {
   onColumnResize: (sortKey: TorrentSortKey, width: number, commit: boolean) => void;
 }
 
-const columns: Array<{ key: TorrentSortKey; label: string; className?: string; width: number; minWidth: number }> = [
+const columns: Array<{ key: TorrentSortKey; label: string; className?: string; width: number; minWidth: number; align?: 'center' | 'right' }> = [
   { key: 'name', label: 'Name', className: 'name-column', width: 390, minWidth: 180 },
-  { key: 'size', label: 'Size', width: 92, minWidth: 72 },
-  { key: 'done', label: 'Done', width: 132, minWidth: 106 },
+  { key: 'size', label: 'Size', width: 92, minWidth: 72, align: 'right' },
+  { key: 'done', label: 'Done', width: 132, minWidth: 106, align: 'center' },
   { key: 'status', label: 'Status', width: 116, minWidth: 88 },
-  { key: 'down', label: 'Down', width: 86, minWidth: 74 },
-  { key: 'up', label: 'Up', width: 86, minWidth: 74 },
-  { key: 'eta', label: 'ETA', width: 72, minWidth: 58 },
-  { key: 'ratio', label: 'Ratio', width: 72, minWidth: 58 },
-  { key: 'peers', label: 'Peers', width: 72, minWidth: 58 },
-  { key: 'added', label: 'Added', width: 172, minWidth: 132 }
+  { key: 'down', label: 'Down', width: 86, minWidth: 74, align: 'right' },
+  { key: 'up', label: 'Up', width: 86, minWidth: 74, align: 'right' },
+  { key: 'eta', label: 'ETA', width: 72, minWidth: 58, align: 'right' },
+  { key: 'ratio', label: 'Ratio', width: 72, minWidth: 58, align: 'right' },
+  { key: 'peers', label: 'Peers', width: 72, minWidth: 58, align: 'right' },
+  { key: 'added', label: 'Added', width: 172, minWidth: 132, align: 'right' }
 ];
+
+function classNames(...names: Array<string | undefined | false>): string | undefined {
+  const filteredNames = names.filter(Boolean);
+  return filteredNames.length > 0 ? filteredNames.join(' ') : undefined;
+}
 
 export function TorrentTable({ torrents, selectedId, sort, columnWidths, onSelect, onSortChange, onColumnResize }: TorrentTableProps): JSX.Element {
   const resolvedColumns = columns.map((column) => ({
@@ -30,8 +36,37 @@ export function TorrentTable({ torrents, selectedId, sort, columnWidths, onSelec
     width: Math.max(column.minWidth, columnWidths[column.key] ?? column.width)
   }));
   const tableWidth = resolvedColumns.reduce((totalWidth, column) => totalWidth + column.width, 0);
+  const { sizeUnitIndex, downloadRateUnitIndex, uploadRateUnitIndex } = useMemo(() => {
+    let maxSize = 0;
+    let maxDownloadRate = 0;
+    let maxUploadRate = 0;
 
-  function startResize(event: React.MouseEvent, sortKey: TorrentSortKey, startWidth: number, minWidth: number): void {
+    for (const torrent of torrents) {
+      const size = torrentListSize(torrent);
+      const downloadRate = torrent.rateDownload || 0;
+      const uploadRate = torrent.rateUpload || 0;
+
+      if (Number.isFinite(size) && size > maxSize) {
+        maxSize = size;
+      }
+
+      if (Number.isFinite(downloadRate) && downloadRate > maxDownloadRate) {
+        maxDownloadRate = downloadRate;
+      }
+
+      if (Number.isFinite(uploadRate) && uploadRate > maxUploadRate) {
+        maxUploadRate = uploadRate;
+      }
+    }
+
+    return {
+      sizeUnitIndex: byteUnitIndexForValue(maxSize),
+      downloadRateUnitIndex: byteUnitIndexForValue(maxDownloadRate),
+      uploadRateUnitIndex: byteUnitIndexForValue(maxUploadRate)
+    };
+  }, [torrents]);
+
+  function startResize(event: ReactMouseEvent, sortKey: TorrentSortKey, startWidth: number, minWidth: number): void {
     event.preventDefault();
     event.stopPropagation();
 
@@ -70,7 +105,11 @@ export function TorrentTable({ torrents, selectedId, sort, columnWidths, onSelec
             {resolvedColumns.map((column) => {
               const isActive = sort.key === column.key;
               return (
-                <th key={column.key} className={column.className} aria-sort={isActive ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                <th
+                  key={column.key}
+                  className={classNames(column.className, column.align === 'right' && 'align-right', column.align === 'center' && 'align-center')}
+                  aria-sort={isActive ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
                   <button type="button" className={isActive ? 'column-sort active' : 'column-sort'} onClick={() => onSortChange(column.key)}>
                     <span>{column.label}</span>
                     <span className="sort-indicator" aria-hidden="true">
@@ -106,8 +145,8 @@ export function TorrentTable({ torrents, selectedId, sort, columnWidths, onSelec
                 <span className="torrent-name">{torrent.name}</span>
                 {torrent.error ? <span className="torrent-error">{torrent.errorString || 'Error'}</span> : null}
               </td>
-              <td>{formatBytes(torrent.sizeWhenDone || torrent.totalSize)}</td>
-              <td className="progress-cell">
+              <td className="number-cell">{formatBytes(torrentListSize(torrent), 1, sizeUnitIndex)}</td>
+              <td className="progress-cell done-cell">
                 <div className="progress-content">
                   <div className="progress-track" aria-label={formatPercent(torrent.percentDone)}>
                     <span style={{ width: formatPercent(torrent.percentDone) }} />
@@ -116,12 +155,12 @@ export function TorrentTable({ torrents, selectedId, sort, columnWidths, onSelec
                 </div>
               </td>
               <td>{statusText(torrent)}</td>
-              <td>{formatRate(torrent.rateDownload)}</td>
-              <td>{formatRate(torrent.rateUpload)}</td>
-              <td>{formatDuration(torrent.eta)}</td>
-              <td>{formatRatio(torrent.uploadRatio)}</td>
-              <td>{torrent.peersConnected ?? 0}</td>
-              <td>{formatDate(torrent.addedDate)}</td>
+              <td className="number-cell">{formatRate(torrent.rateDownload, downloadRateUnitIndex)}</td>
+              <td className="number-cell">{formatRate(torrent.rateUpload, uploadRateUnitIndex)}</td>
+              <td className="number-cell">{formatDuration(torrent.eta)}</td>
+              <td className="number-cell">{formatRatio(torrent.uploadRatio)}</td>
+              <td className="number-cell">{torrent.peersConnected ?? 0}</td>
+              <td className="date-cell">{formatDate(torrent.addedDate)}</td>
             </tr>
           ))}
         </tbody>
