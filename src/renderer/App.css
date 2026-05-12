@@ -451,7 +451,7 @@ select:disabled {
 
 .progress-content {
   display: grid;
-  grid-template-columns: minmax(34px, 1fr) max-content;
+  grid-template-columns: minmax(34px, 1fr) 6ch;
   gap: 6px;
   align-items: center;
   min-width: 0;
@@ -475,8 +475,10 @@ select:disabled {
 
 .progress-cell em {
   justify-self: end;
+  width: 6ch;
   color: #505750;
   font-style: normal;
+  text-align: right;
 }
 
 .detail-pane {
