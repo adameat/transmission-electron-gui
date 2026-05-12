@@ -16,6 +16,7 @@ import type {
 } from '../src/shared/types';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const hidesWindowMenuBar = process.platform !== 'darwin';
 
 let mainWindow: BrowserWindow | null = null;
 let activeProfile: TransmissionProfile | null = null;
@@ -291,6 +292,7 @@ function createWindow(): void {
     minHeight: 640,
     title: 'Transmission Electron GUI',
     backgroundColor: '#f4f4f1',
+    autoHideMenuBar: hidesWindowMenuBar,
     show: false,
     webPreferences: {
       preload: resolvePreloadPath(),
@@ -299,6 +301,10 @@ function createWindow(): void {
       sandbox: false
     }
   });
+
+  if (hidesWindowMenuBar) {
+    mainWindow.setMenuBarVisibility(false);
+  }
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
 
@@ -314,23 +320,30 @@ function createWindow(): void {
   }
 }
 
-function createMenu(): void {
-  const template: Electron.MenuItemConstructorOptions[] = [
-    {
-      label: 'File',
-      submenu: [{ role: 'quit' }]
-    },
-    {
-      label: 'View',
-      submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }]
-    },
-    {
-      label: 'Window',
-      submenu: [{ role: 'minimize' }, { role: 'close' }]
-    }
-  ];
+function configureApplicationMenu(): void {
+  if (process.platform === 'darwin') {
+    const template: Electron.MenuItemConstructorOptions[] = [
+      {
+        label: app.name,
+        submenu: [
+          { role: 'about' },
+          { type: 'separator' },
+          { role: 'services' },
+          { type: 'separator' },
+          { role: 'hide' },
+          { role: 'hideOthers' },
+          { role: 'unhide' },
+          { type: 'separator' },
+          { role: 'quit' }
+        ]
+      }
+    ];
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    return;
+  }
+
+  Menu.setApplicationMenu(null);
 }
 
 function registerIpc(): void {
@@ -348,7 +361,7 @@ function registerIpc(): void {
 
 app.whenReady().then(() => {
   registerIpc();
-  createMenu();
+  configureApplicationMenu();
   createWindow();
 
   app.on('activate', () => {
