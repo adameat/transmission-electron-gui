@@ -1,5 +1,9 @@
 import type { SessionStats, Torrent, TorrentFilter } from '@shared/types';
 
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export const FILTER_LABELS: Record<TorrentFilter, string> = {
   all: 'All',
   downloading: 'Downloading',

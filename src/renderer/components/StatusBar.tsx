@@ -7,9 +7,14 @@ interface StatusBarProps {
   stats: SessionStats | null;
   selectedTorrent: Torrent | null;
   message: string;
+  activity: StatusActivity;
 }
 
-export function StatusBar({ connected, profile, stats, selectedTorrent, message }: StatusBarProps): JSX.Element {
+export type StatusActivity = 'idle' | 'requesting' | 'receiving';
+
+export function StatusBar({ connected, profile, stats, selectedTorrent, message, activity }: StatusBarProps): JSX.Element {
+  const active = activity !== 'idle';
+
   return (
     <footer className="status-bar">
       <span className={connected ? 'connection-dot connected' : 'connection-dot'} />
@@ -21,7 +26,10 @@ export function StatusBar({ connected, profile, stats, selectedTorrent, message 
           ? `${selectedTorrent.name} · ${formatBytes(selectedTorrent.downloadedEver)} down · ${formatBytes(selectedTorrent.uploadedEver)} up`
           : 'No selection'}
       </span>
-      <strong>{message}</strong>
+      <strong className={active ? 'status-message active' : 'status-message'} aria-live="polite">
+        {active ? <span className="status-spinner" aria-hidden="true" /> : null}
+        <span>{message}</span>
+      </strong>
     </footer>
   );
 }

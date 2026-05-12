@@ -187,6 +187,17 @@ export interface TorrentGetResult {
   removed?: number[];
 }
 
+export interface TorrentAddEntry {
+  id?: number;
+  name?: string;
+  hashString?: string;
+}
+
+export interface TorrentAddResult {
+  'torrent-added'?: TorrentAddEntry;
+  'torrent-duplicate'?: TorrentAddEntry;
+}
+
 export type TorrentFilter =
   | 'all'
   | 'downloading'
