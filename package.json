@@ -1,7 +1,11 @@
 {
   "name": "transmission-electron-gui",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A modern Electron desktop GUI for Transmission daemon RPC.",
+  "author": {
+    "name": "adameat",
+    "email": "adameat@users.noreply.github.com"
+  },
   "private": true,
   "type": "module",
   "main": "out/main/index.js",
@@ -16,9 +20,9 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "tsc --noEmit && electron-vite build",
-    "dist:win": "npm run build && electron-builder --win nsis --x64",
-    "dist:mac": "npm run build && electron-builder --mac dmg zip --x64 --arm64",
-    "dist:linux": "npm run build && electron-builder --linux AppImage deb --x64",
+    "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never",
+    "dist:mac": "npm run build && electron-builder --mac dmg zip --x64 --arm64 --publish never",
+    "dist:linux": "npm run build && electron-builder --linux AppImage deb --x64 --publish never",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit"
   },
