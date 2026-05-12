@@ -4,6 +4,7 @@ import type {
   ConnectionResult,
   SessionStats,
   Torrent,
+  TorrentAddResult,
   TorrentColumnWidths,
   TorrentFilter,
   TorrentGetResult,
@@ -12,16 +13,16 @@ import type {
   TransmissionProfile,
   TransmissionSession
 } from '@shared/types';
-import { AddTorrentDialog, type AddTorrentPayload } from './components/AddTorrentDialog';
+import { AddTorrentDialog, type AddTorrentPayload, type AddTorrentProgress } from './components/AddTorrentDialog';
 import { ConnectionBar } from './components/ConnectionBar';
 import { ConnectionSettingsDialog } from './components/ConnectionSettingsDialog';
 import { DetailPane, type DetailTab } from './components/DetailPane';
 import { FilterSidebar } from './components/FilterSidebar';
-import { StatusBar } from './components/StatusBar';
+import { StatusBar, type StatusActivity } from './components/StatusBar';
 import { Toolbar } from './components/Toolbar';
 import { TorrentTable } from './components/TorrentTable';
 import { torrentDetailFields, torrentFields } from './rpcFields';
-import { countFilters, torrentMatchesFilter } from './utils';
+import { countFilters, errorMessage, torrentMatchesFilter } from './utils';
 import './App.css';
 
 const defaultProfile: TransmissionProfile = {
@@ -47,6 +48,34 @@ const defaultSettings: AppSettings = {
 };
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+const progressFrameFallbackMs = 50;
+
+interface RefreshOptions {
+  force?: boolean;
+  showProgress?: boolean;
+  label?: string;
+}
+
+function waitForProgressFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let frameId = 0;
+
+    const finish = (): void => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      window.clearTimeout(timeoutId);
+      window.cancelAnimationFrame(frameId);
+      resolve();
+    };
+
+    const timeoutId = window.setTimeout(finish, progressFrameFallbackMs);
+    frameId = window.requestAnimationFrame(finish);
+  });
+}
 
 function ensureProfile(profile: TransmissionProfile): TransmissionProfile {
   return {
@@ -57,10 +86,6 @@ function ensureProfile(profile: TransmissionProfile): TransmissionProfile {
     port: Number(profile.port) || 9091,
     rpcPath: profile.rpcPath.startsWith('/') ? profile.rpcPath : `/${profile.rpcPath || 'transmission/rpc'}`
   };
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function sortValue(torrent: Torrent, sortKey: TorrentSortKey): number | string {
@@ -128,6 +153,7 @@ export default function App(): JSX.Element {
   const [addOpen, setAddOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [statusActivity, setStatusActivity] = useState<StatusActivity>('idle');
   const [message, setMessage] = useState('Ready');
   const autoConnectStarted = useRef(false);
   const connectionRunId = useRef(0);
@@ -144,23 +170,48 @@ export default function App(): JSX.Element {
     return savedSettings;
   }, []);
 
-  const refresh = useCallback(async (force = false): Promise<void> => {
+  const refresh = useCallback(async (options: boolean | RefreshOptions = {}): Promise<void> => {
+    const force = typeof options === 'boolean' ? options : Boolean(options.force);
+    const showProgress = typeof options !== 'boolean' && Boolean(options.showProgress);
+    const label = typeof options === 'boolean' ? 'Refresh' : options.label ?? 'Refresh';
+
     if (!force && !connected) {
       return;
     }
 
-    const [torrentResult, nextStats] = await Promise.all([
-      rpc<TorrentGetResult>('torrent-get', { fields: torrentFields(rpcVersion) }),
-      rpc<SessionStats>('session-stats')
-    ]);
+    try {
+      if (showProgress) {
+        setStatusActivity('requesting');
+        setMessage(`${label}: sending request...`);
+        await waitForProgressFrame();
+      }
 
-    setTorrents(torrentResult.torrents);
-    setStats(nextStats);
+      const torrentRequest = rpc<TorrentGetResult>('torrent-get', { fields: torrentFields(rpcVersion) });
+      const statsRequest = rpc<SessionStats>('session-stats');
 
-    if (!selectedId && torrentResult.torrents.length > 0) {
-      setSelectedId(torrentResult.torrents[0].id);
-    } else if (selectedId && !torrentResult.torrents.some((torrent) => torrent.id === selectedId)) {
-      setSelectedId(torrentResult.torrents[0]?.id ?? null);
+      if (showProgress) {
+        setStatusActivity('receiving');
+        setMessage(`${label}: waiting for torrent data...`);
+      }
+
+      const [torrentResult, nextStats] = await Promise.all([torrentRequest, statsRequest]);
+
+      setTorrents(torrentResult.torrents);
+      setStats(nextStats);
+
+      if (!selectedId && torrentResult.torrents.length > 0) {
+        setSelectedId(torrentResult.torrents[0].id);
+      } else if (selectedId && !torrentResult.torrents.some((torrent) => torrent.id === selectedId)) {
+        setSelectedId(torrentResult.torrents[0]?.id ?? null);
+      }
+
+      if (showProgress) {
+        setMessage(`Refreshed ${torrentResult.torrents.length} ${torrentResult.torrents.length === 1 ? 'torrent' : 'torrents'}`);
+      }
+    } finally {
+      if (showProgress) {
+        setStatusActivity('idle');
+      }
     }
   }, [connected, rpc, rpcVersion, selectedId]);
 
@@ -363,6 +414,17 @@ export default function App(): JSX.Element {
     await connectToProfile(profile, settings);
   }
 
+  async function refreshNow(): Promise<void> {
+    setBusy(true);
+    try {
+      await refresh({ showProgress: true });
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function disconnect(): Promise<void> {
     connectionRunId.current += 1;
     await transmissionApi().disconnect();
@@ -403,8 +465,12 @@ export default function App(): JSX.Element {
     setSelectedId(null);
   }
 
-  async function addTorrent(payload: AddTorrentPayload): Promise<void> {
+  async function addTorrent(payload: AddTorrentPayload, reportProgress: AddTorrentProgress = () => undefined): Promise<void> {
     setBusy(true);
+    setStatusActivity('requesting');
+    setMessage('Add torrent: sending request...');
+    reportProgress('Sending request to Transmission...');
+
     try {
       const addArguments: Record<string, unknown> = {
         paused: payload.paused
@@ -426,13 +492,37 @@ export default function App(): JSX.Element {
         addArguments['peer-limit'] = payload.peerLimit;
       }
 
-      await rpc('torrent-add', addArguments);
-      setAddOpen(false);
-      await refresh();
-      setMessage('Torrent added');
+      await waitForProgressFrame();
+      const addRequest = rpc<TorrentAddResult>('torrent-add', addArguments);
+
+      setStatusActivity('receiving');
+      setMessage('Add torrent: waiting for response...');
+      reportProgress('Waiting for Transmission response...');
+
+      const addResult = await addRequest;
+      const duplicateTorrent = addResult['torrent-duplicate'];
+      const addedTorrent = addResult['torrent-added'];
+
+      if (duplicateTorrent) {
+        throw new Error(`Torrent already exists: ${duplicateTorrent.name || duplicateTorrent.hashString || 'same torrent'}`);
+      }
+
+      if (!addedTorrent) {
+        throw new Error('Transmission accepted the request but did not report an added torrent.');
+      }
+
+      try {
+        reportProgress('Refreshing torrent list...');
+        await refresh({ force: true, showProgress: true, label: 'Refresh after add' });
+        setMessage(`Added ${addedTorrent.name || 'torrent'}`);
+      } catch (refreshError) {
+        setMessage(`Torrent added, but refresh failed: ${errorMessage(refreshError)}`);
+      }
     } catch (error) {
       setMessage(errorMessage(error));
+      throw error;
     } finally {
+      setStatusActivity('idle');
       setBusy(false);
     }
   }
@@ -476,7 +566,7 @@ export default function App(): JSX.Element {
         hasSelection={Boolean(selectedId)}
         busy={busy}
         onAdd={() => setAddOpen(true)}
-        onRefresh={() => refresh().catch((error) => setMessage(errorMessage(error)))}
+        onRefresh={refreshNow}
         onStart={() => runTorrentAction('torrent-start')}
         onStop={() => runTorrentAction('torrent-stop')}
         onRemove={removeTorrent}
@@ -520,7 +610,14 @@ export default function App(): JSX.Element {
         </section>
       </main>
 
-      <StatusBar connected={connected} profile={profile} stats={stats} selectedTorrent={selectedTorrent} message={message} />
+      <StatusBar
+        connected={connected}
+        profile={profile}
+        stats={stats}
+        selectedTorrent={selectedTorrent}
+        message={message}
+        activity={statusActivity}
+      />
       <ConnectionSettingsDialog
         open={connectionsOpen}
         profiles={settings.profiles}
