@@ -1,5 +1,5 @@
 import type { SessionStats, Torrent, TorrentFile, TorrentFileStat, TransmissionSession } from '@shared/types';
-import { formatBytes, formatDate, formatDuration, formatPercent, formatRate, formatRatio, priorityLabel, statusText } from '../utils';
+import { formatBytes, formatDate, formatDuration, formatPercent, formatRate, formatRatio, priorityLabel, statusText, torrentTotalSize } from '../utils';
 
 export type DetailTab = 'general' | 'files' | 'peers' | 'trackers' | 'stats';
 
@@ -97,7 +97,7 @@ function GeneralTab({ torrent, session }: { torrent: Torrent; session: Transmiss
       />
       <InfoGrid
         items={[
-          ['Total size', formatBytes(torrent.totalSize || torrent.sizeWhenDone)],
+          ['Total size', formatBytes(torrentTotalSize(torrent))],
           ['Left', formatBytes(torrent.leftUntilDone)],
           ['Downloaded', formatBytes(torrent.downloadedEver)],
           ['Uploaded', formatBytes(torrent.uploadedEver)],

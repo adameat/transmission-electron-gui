@@ -15,19 +15,45 @@ export const FILTER_LABELS: Record<TorrentFilter, string> = {
   waiting: 'Waiting'
 };
 
-export function formatBytes(value = 0, fractionDigits = 1): string {
-  if (!Number.isFinite(value) || value <= 0) {
-    return '0 B';
-  }
-
-  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-  const unitIndex = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
-  const scaledValue = value / 1024 ** unitIndex;
-  return `${scaledValue.toFixed(unitIndex === 0 ? 0 : fractionDigits)} ${units[unitIndex]}`;
+export function torrentListSize(torrent: Torrent): number {
+  const selectedSize = Number.isFinite(torrent.sizeWhenDone) ? torrent.sizeWhenDone : 0;
+  const totalSize = Number.isFinite(torrent.totalSize) ? torrent.totalSize : 0;
+  return selectedSize > 0 ? selectedSize : totalSize;
 }
 
-export function formatRate(value = 0): string {
-  return `${formatBytes(value)}/s`;
+export function torrentTotalSize(torrent: Torrent): number {
+  const totalSize = Number.isFinite(torrent.totalSize) ? torrent.totalSize : 0;
+  const selectedSize = Number.isFinite(torrent.sizeWhenDone) ? torrent.sizeWhenDone : 0;
+  return totalSize > 0 ? totalSize : selectedSize;
+}
+
+const byteUnits = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+
+function clampByteUnitIndex(unitIndex: number): number {
+  if (!Number.isFinite(unitIndex)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(Math.trunc(unitIndex), byteUnits.length - 1));
+}
+
+export function byteUnitIndexForValue(value = 0): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+
+  return clampByteUnitIndex(Math.floor(Math.log(value) / Math.log(1024)));
+}
+
+export function formatBytes(value = 0, fractionDigits = 1, unitIndex?: number): string {
+  const normalizedValue = Number.isFinite(value) && value > 0 ? value : 0;
+  const resolvedUnitIndex = unitIndex === undefined ? byteUnitIndexForValue(normalizedValue) : clampByteUnitIndex(unitIndex);
+  const scaledValue = normalizedValue / 1024 ** resolvedUnitIndex;
+  return `${scaledValue.toFixed(resolvedUnitIndex === 0 ? 0 : fractionDigits)} ${byteUnits[resolvedUnitIndex]}`;
+}
+
+export function formatRate(value = 0, unitIndex?: number): string {
+  return `${formatBytes(value, 1, unitIndex)}/s`;
 }
 
 export function formatPercent(value = 0): string {

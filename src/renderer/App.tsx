@@ -22,7 +22,7 @@ import { StatusBar, type StatusActivity } from './components/StatusBar';
 import { Toolbar } from './components/Toolbar';
 import { TorrentTable } from './components/TorrentTable';
 import { torrentDetailFields, torrentFields } from './rpcFields';
-import { countFilters, errorMessage, torrentMatchesFilter } from './utils';
+import { countFilters, errorMessage, torrentListSize, torrentMatchesFilter } from './utils';
 import './App.css';
 
 const defaultProfile: TransmissionProfile = {
@@ -91,7 +91,7 @@ function ensureProfile(profile: TransmissionProfile): TransmissionProfile {
 function sortValue(torrent: Torrent, sortKey: TorrentSortKey): number | string {
   switch (sortKey) {
     case 'size':
-      return torrent.sizeWhenDone || torrent.totalSize || 0;
+      return torrentListSize(torrent);
     case 'done':
       return torrent.percentDone || 0;
     case 'status':

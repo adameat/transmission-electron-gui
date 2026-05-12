@@ -331,6 +331,34 @@ select:disabled {
   color: #1f6e5a;
 }
 
+.torrent-table th.align-right .column-sort {
+  grid-template-columns: minmax(0, 1fr) 12px;
+  text-align: right;
+}
+
+.torrent-table th.align-right .column-sort > span:first-child {
+  overflow: hidden;
+  justify-self: end;
+  text-overflow: ellipsis;
+}
+
+.torrent-table th.align-center .column-sort {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+  text-align: center;
+}
+
+.torrent-table th.align-center .column-sort > span:first-child {
+  overflow: hidden;
+  justify-self: center;
+  text-overflow: ellipsis;
+}
+
+.torrent-table th.align-center .sort-indicator {
+  position: absolute;
+  right: 0;
+}
+
 .sort-indicator {
   display: inline-grid;
   width: 12px;
@@ -404,6 +432,19 @@ select:disabled {
   text-overflow: ellipsis;
 }
 
+.torrent-table td.number-cell,
+.torrent-table td.date-cell {
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+}
+
+.torrent-table td.done-cell {
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+}
+
 .progress-cell {
   min-width: 0;
 }
@@ -433,6 +474,7 @@ select:disabled {
 }
 
 .progress-cell em {
+  justify-self: end;
   color: #505750;
   font-style: normal;
 }
