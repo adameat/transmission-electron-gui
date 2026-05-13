@@ -24,6 +24,10 @@ const sizeUnitOptions: Array<{ value: SizeUnitLimit; label: string }> = [
   { value: 'gigabytes', label: 'GB' }
 ];
 
+function isSizeUnitLimit(value: string): value is SizeUnitLimit {
+  return sizeUnitOptions.some((option) => option.value === value);
+}
+
 export function AppSettingsDialog({ open, interfaceTheme, sizeUnitLimit, busy, onClose, onSave }: AppSettingsDialogProps): JSX.Element | null {
   const [draftTheme, setDraftTheme] = useState<InterfaceTheme>(interfaceTheme);
   const [draftSizeUnitLimit, setDraftSizeUnitLimit] = useState<SizeUnitLimit>(sizeUnitLimit);
@@ -131,7 +135,7 @@ export function AppSettingsDialog({ open, interfaceTheme, sizeUnitLimit, busy, o
               <select
                 value={draftSizeUnitLimit}
                 aria-label="Size column maximum unit"
-                onChange={(event) => setDraftSizeUnitLimit(event.target.value as SizeUnitLimit)}
+                onChange={(event) => setDraftSizeUnitLimit(isSizeUnitLimit(event.target.value) ? event.target.value : 'auto')}
                 disabled={disabled}
               >
                 {sizeUnitOptions.map((option) => (
