@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AppSettings,
   ConnectionResult,
+  DaemonSettingsPayload,
   InterfaceTheme,
   SessionStats,
   Torrent,
@@ -19,6 +20,7 @@ import { AddTorrentDialog, type AddTorrentPayload, type AddTorrentProgress } fro
 import { AppSettingsDialog } from './components/AppSettingsDialog';
 import { ConnectionBar } from './components/ConnectionBar';
 import { ConnectionSettingsDialog } from './components/ConnectionSettingsDialog';
+import { DaemonSettingsDialog } from './components/DaemonSettingsDialog';
 import { DetailPane, type DetailTab } from './components/DetailPane';
 import { FilterSidebar } from './components/FilterSidebar';
 import { StatusBar, type StatusActivity } from './components/StatusBar';
@@ -224,6 +226,7 @@ export default function App(): JSX.Element {
   const [addOpen, setAddOpen] = useState(false);
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
+  const [daemonSettingsOpen, setDaemonSettingsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [statusActivity, setStatusActivity] = useState<StatusActivity>('idle');
   const [message, setMessage] = useState('Ready');
@@ -579,6 +582,43 @@ export default function App(): JSX.Element {
     setMessage('App settings saved');
   }
 
+  async function openDaemonSettings(): Promise<void> {
+    if (!connected) {
+      return;
+    }
+
+    setBusy(true);
+    setMessage('Loading daemon settings...');
+
+    try {
+      const nextSession = await rpc<TransmissionSession>('session-get');
+      setSession(nextSession);
+      setDaemonSettingsOpen(true);
+      setMessage('Daemon settings loaded');
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveDaemonSettings(daemonSettings: DaemonSettingsPayload): Promise<void> {
+    setBusy(true);
+    setMessage('Saving daemon settings...');
+
+    try {
+      await rpc('session-set', daemonSettings);
+      const nextSession = await rpc<TransmissionSession>('session-get');
+      setSession(nextSession);
+      setMessage('Daemon settings saved');
+    } catch (error) {
+      setMessage(errorMessage(error));
+      throw error;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function connect(): Promise<void> {
     await connectToProfile(profile);
   }
@@ -755,6 +795,7 @@ export default function App(): JSX.Element {
         onVerify={() => runTorrentAction('torrent-verify')}
         onReannounce={() => runTorrentAction('torrent-reannounce')}
         onOpenSettings={() => setAppSettingsOpen(true)}
+        onOpenDaemonSettings={openDaemonSettings}
       />
 
       <main className="main-layout">
@@ -815,6 +856,13 @@ export default function App(): JSX.Element {
         busy={busy}
         onClose={() => setAppSettingsOpen(false)}
         onSave={saveAppSettings}
+      />
+      <DaemonSettingsDialog
+        open={daemonSettingsOpen}
+        session={session}
+        busy={busy}
+        onClose={() => setDaemonSettingsOpen(false)}
+        onSave={saveDaemonSettings}
       />
       <AddTorrentDialog
         open={addOpen}
