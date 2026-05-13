@@ -22,7 +22,7 @@ const columns: Array<{ key: TorrentSortKey; label: string; className?: string; w
   { key: 'eta', label: 'ETA', width: 72, minWidth: 58, align: 'right' },
   { key: 'ratio', label: 'Ratio', width: 72, minWidth: 58, align: 'right' },
   { key: 'peers', label: 'Peers', width: 72, minWidth: 58, align: 'right' },
-  { key: 'added', label: 'Added', width: 172, minWidth: 132, align: 'right' }
+  { key: 'added', label: 'Added', width: 148, minWidth: 132, align: 'right' }
 ];
 
 function classNames(...names: Array<string | undefined | false>): string | undefined {

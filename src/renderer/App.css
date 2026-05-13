@@ -564,6 +564,11 @@ select:disabled {
   text-overflow: ellipsis;
 }
 
+.torrent-table td.date-cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .torrent-table td.done-cell {
   overflow: hidden;
   text-align: center;
