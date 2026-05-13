@@ -671,10 +671,6 @@ export default function App(): JSX.Element {
         addArguments['download-dir'] = payload.downloadDir;
       }
 
-      if (payload.peerLimit && payload.peerLimit > 0) {
-        addArguments['peer-limit'] = payload.peerLimit;
-      }
-
       await waitForProgressFrame();
       const addRequest = rpc<TorrentAddResult>('torrent-add', addArguments);
 
