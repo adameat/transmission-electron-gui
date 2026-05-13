@@ -833,6 +833,67 @@ select:disabled {
   flex: 1;
 }
 
+.download-dir-field {
+  min-width: 0;
+}
+
+.download-dir-control {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.download-dir-list {
+  position: fixed;
+  z-index: 1002;
+  display: grid;
+  overflow: auto;
+  border: 1px solid #aab3ac;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(31, 35, 32, 0.18);
+}
+
+.download-dir-option {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 5px 8px;
+  background: #ffffff;
+  color: #202321;
+  text-align: left;
+  cursor: pointer;
+}
+
+.download-dir-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-dir-option:hover,
+.download-dir-option:focus-visible {
+  background: #edf6f2;
+  outline: none;
+}
+
+.download-dir-option.selected {
+  color: #1f6e5a;
+  font-weight: 700;
+}
+
+.download-dir-toggle {
+  flex: 0 0 auto;
+}
+
+.download-dir-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
 .selected-file {
   overflow: hidden;
   border: 1px solid #d8dcd6;
