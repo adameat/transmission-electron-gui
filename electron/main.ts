@@ -97,6 +97,10 @@ function normalizeProfile(profile: Partial<StoredTransmissionProfile>): Transmis
   };
 }
 
+function normalizeInterfaceTheme(theme: unknown): AppSettings['interfaceTheme'] {
+  return theme === 'light' || theme === 'dark' ? theme : 'system';
+}
+
 function normalizeSettings(settings: Partial<StoredAppSettings>): AppSettings {
   const profiles = settings.profiles?.length
     ? settings.profiles.map((profile) => normalizeProfile(profile))
@@ -114,6 +118,7 @@ function normalizeSettings(settings: Partial<StoredAppSettings>): AppSettings {
   return {
     profiles,
     activeProfileId: settings.activeProfileId || profiles[0].id,
+    interfaceTheme: normalizeInterfaceTheme(settings.interfaceTheme),
     refreshIntervalSeconds: Number(settings.refreshIntervalSeconds) || 5,
     torrentSort: {
       key: settings.torrentSort?.key || 'name',

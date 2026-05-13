@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AppSettings,
   ConnectionResult,
+  InterfaceTheme,
   SessionStats,
   Torrent,
   TorrentAddResult,
@@ -15,6 +16,7 @@ import type {
 } from '@shared/types';
 import { collectDownloadDirs, maxTorrentDownloadDirSuggestionScan } from '@shared/downloadDirs';
 import { AddTorrentDialog, type AddTorrentPayload, type AddTorrentProgress } from './components/AddTorrentDialog';
+import { AppSettingsDialog } from './components/AppSettingsDialog';
 import { ConnectionBar } from './components/ConnectionBar';
 import { ConnectionSettingsDialog } from './components/ConnectionSettingsDialog';
 import { DetailPane, type DetailTab } from './components/DetailPane';
@@ -40,6 +42,7 @@ const defaultProfile: TransmissionProfile = {
 const defaultSettings: AppSettings = {
   profiles: [defaultProfile],
   activeProfileId: defaultProfile.id,
+  interfaceTheme: 'system',
   refreshIntervalSeconds: 5,
   torrentSort: {
     key: 'name',
@@ -186,6 +189,24 @@ function sameColumnWidths(firstColumnWidths: TorrentColumnWidths, secondColumnWi
   );
 }
 
+function normalizeInterfaceTheme(theme: unknown, fallback: InterfaceTheme = 'system'): InterfaceTheme {
+  return theme === 'system' || theme === 'light' || theme === 'dark' ? theme : fallback;
+}
+
+function normalizeRendererSettings(settings: Partial<AppSettings>, fallbackSettings = defaultSettings): AppSettings {
+  return {
+    ...fallbackSettings,
+    ...settings,
+    profiles: settings.profiles?.length ? settings.profiles : fallbackSettings.profiles,
+    activeProfileId: settings.activeProfileId || fallbackSettings.activeProfileId,
+    interfaceTheme: normalizeInterfaceTheme(settings.interfaceTheme, fallbackSettings.interfaceTheme),
+    refreshIntervalSeconds: Number(settings.refreshIntervalSeconds) || fallbackSettings.refreshIntervalSeconds,
+    torrentSort: settings.torrentSort ?? fallbackSettings.torrentSort,
+    torrentColumnWidths: settings.torrentColumnWidths ?? fallbackSettings.torrentColumnWidths,
+    recentDownloadDirs: settings.recentDownloadDirs ?? fallbackSettings.recentDownloadDirs
+  };
+}
+
 export default function App(): JSX.Element {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [profile, setProfile] = useState<TransmissionProfile>(defaultProfile);
@@ -201,6 +222,7 @@ export default function App(): JSX.Element {
   const [query, setQuery] = useState('');
   const [detailTab, setDetailTab] = useState<DetailTab>('general');
   const [addOpen, setAddOpen] = useState(false);
+  const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [statusActivity, setStatusActivity] = useState<StatusActivity>('idle');
@@ -268,7 +290,8 @@ export default function App(): JSX.Element {
     );
 
     try {
-      const savedSettings = await saveOperation;
+      // A running main process from before a new setting was introduced may return a settings object without that key.
+      const savedSettings = normalizeRendererSettings(await saveOperation, pendingSettings);
       persistedSettingsRef.current = savedSettings;
 
       // Settings writes can overlap; only apply the normalized response if this save is still the latest local settings object.
@@ -358,11 +381,12 @@ export default function App(): JSX.Element {
     api
       .loadSettings()
       .then((loadedSettings) => {
-        const loadedProfile = loadedSettings.profiles.find((savedProfile) => savedProfile.id === loadedSettings.activeProfileId) ?? loadedSettings.profiles[0];
-        persistedSettingsRef.current = loadedSettings;
-        applySettings(loadedSettings);
-        applySort(loadedSettings.torrentSort);
-        applyColumnWidths(loadedSettings.torrentColumnWidths);
+        const normalizedSettings = normalizeRendererSettings(loadedSettings);
+        const loadedProfile = normalizedSettings.profiles.find((savedProfile) => savedProfile.id === normalizedSettings.activeProfileId) ?? normalizedSettings.profiles[0];
+        persistedSettingsRef.current = normalizedSettings;
+        applySettings(normalizedSettings);
+        applySort(normalizedSettings.torrentSort);
+        applyColumnWidths(normalizedSettings.torrentColumnWidths);
         setProfile(loadedProfile);
 
         if (!autoConnectStarted.current) {
@@ -413,6 +437,7 @@ export default function App(): JSX.Element {
   );
 
   const counts = useMemo(() => countFilters(torrents), [torrents]);
+  const effectiveInterfaceTheme = normalizeInterfaceTheme(settings.interfaceTheme);
   const sessionDefaultDownloadDir = String(session?.['download-dir'] ?? '');
   const defaultAddDownloadDir = useMemo(
     () => collectDownloadDirs([...(settings.recentDownloadDirs ?? []), sessionDefaultDownloadDir])[0] ?? '',
@@ -544,6 +569,14 @@ export default function App(): JSX.Element {
     }
 
     setMessage('Connections saved');
+  }
+
+  async function saveAppSettings(interfaceTheme: InterfaceTheme): Promise<void> {
+    await saveSettings({
+      ...settingsRef.current,
+      interfaceTheme
+    });
+    setMessage('App settings saved');
   }
 
   async function connect(): Promise<void> {
@@ -702,7 +735,7 @@ export default function App(): JSX.Element {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={effectiveInterfaceTheme}>
       <ConnectionBar
         profile={profile}
         profiles={settings.profiles}
@@ -725,6 +758,7 @@ export default function App(): JSX.Element {
         onRemove={removeTorrent}
         onVerify={() => runTorrentAction('torrent-verify')}
         onReannounce={() => runTorrentAction('torrent-reannounce')}
+        onOpenSettings={() => setAppSettingsOpen(true)}
       />
 
       <main className="main-layout">
@@ -778,6 +812,13 @@ export default function App(): JSX.Element {
         busy={busy}
         onClose={() => setConnectionsOpen(false)}
         onSave={saveProfiles}
+      />
+      <AppSettingsDialog
+        open={appSettingsOpen}
+        interfaceTheme={effectiveInterfaceTheme}
+        busy={busy}
+        onClose={() => setAppSettingsOpen(false)}
+        onSave={saveAppSettings}
       />
       <AddTorrentDialog
         open={addOpen}
