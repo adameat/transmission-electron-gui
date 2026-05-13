@@ -1,5 +1,6 @@
 import { Monitor, Moon, Sun, X } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { isSizeUnitLimit, SIZE_UNIT_LIMITS } from '@shared/types';
 import type { InterfaceTheme, SizeUnitLimit } from '@shared/types';
 
 interface AppSettingsDialogProps {
@@ -17,16 +18,14 @@ const themeOptions: Array<{ value: InterfaceTheme; label: string; icon: JSX.Elem
   { value: 'dark', label: 'Dark', icon: <Moon size={17} aria-hidden="true" /> }
 ];
 
-const sizeUnitOptions: Array<{ value: SizeUnitLimit; label: string }> = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'bytes', label: 'Bytes' },
-  { value: 'megabytes', label: 'MB' },
-  { value: 'gigabytes', label: 'GB' }
-];
+const sizeUnitLabels: Record<SizeUnitLimit, string> = {
+  auto: 'Auto',
+  bytes: 'Bytes',
+  megabytes: 'MB',
+  gigabytes: 'GB'
+};
 
-function isSizeUnitLimit(value: string): value is SizeUnitLimit {
-  return sizeUnitOptions.some((option) => option.value === value);
-}
+const sizeUnitOptions = SIZE_UNIT_LIMITS.map((value) => ({ value, label: sizeUnitLabels[value] }));
 
 export function AppSettingsDialog({ open, interfaceTheme, sizeUnitLimit, busy, onClose, onSave }: AppSettingsDialogProps): JSX.Element | null {
   const [draftTheme, setDraftTheme] = useState<InterfaceTheme>(interfaceTheme);

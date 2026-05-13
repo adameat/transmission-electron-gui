@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isSizeUnitLimit } from '@shared/types';
 import type {
   AppSettings,
   ConnectionResult,
@@ -198,9 +199,7 @@ function normalizeInterfaceTheme(theme: unknown, fallback: InterfaceTheme = 'sys
 }
 
 function normalizeSizeUnitLimit(sizeUnitLimit: unknown, fallback: SizeUnitLimit = 'auto'): SizeUnitLimit {
-  return sizeUnitLimit === 'auto' || sizeUnitLimit === 'bytes' || sizeUnitLimit === 'megabytes' || sizeUnitLimit === 'gigabytes'
-    ? sizeUnitLimit
-    : fallback;
+  return isSizeUnitLimit(sizeUnitLimit) ? sizeUnitLimit : fallback;
 }
 
 function normalizeRendererSettings(settings: Partial<AppSettings>, fallbackSettings = defaultSettings): AppSettings {

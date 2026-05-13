@@ -5,15 +5,16 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeDownloadDirs } from '../src/shared/downloadDirs';
-import type {
-  AppSettings,
-  ConnectionResult,
-  OpenedTorrentFile,
-  RpcEnvelope,
-  RpcRequest,
-  SessionStats,
-  TransmissionProfile,
-  TransmissionSession
+import {
+  isSizeUnitLimit,
+  type AppSettings,
+  type ConnectionResult,
+  type OpenedTorrentFile,
+  type RpcEnvelope,
+  type RpcRequest,
+  type SessionStats,
+  type TransmissionProfile,
+  type TransmissionSession
 } from '../src/shared/types';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -102,9 +103,7 @@ function normalizeInterfaceTheme(theme: unknown): AppSettings['interfaceTheme'] 
 }
 
 function normalizeSizeUnitLimit(sizeUnitLimit: unknown): AppSettings['sizeUnitLimit'] {
-  return sizeUnitLimit === 'auto' || sizeUnitLimit === 'bytes' || sizeUnitLimit === 'megabytes' || sizeUnitLimit === 'gigabytes'
-    ? sizeUnitLimit
-    : 'auto';
+  return isSizeUnitLimit(sizeUnitLimit) ? sizeUnitLimit : 'auto';
 }
 
 function normalizeSettings(settings: Partial<StoredAppSettings>): AppSettings {

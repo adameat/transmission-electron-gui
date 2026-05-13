@@ -1,6 +1,11 @@
 export type RpcProtocol = 'http' | 'https';
 export type InterfaceTheme = 'system' | 'light' | 'dark';
-export type SizeUnitLimit = 'auto' | 'bytes' | 'megabytes' | 'gigabytes';
+export const SIZE_UNIT_LIMITS = ['auto', 'bytes', 'megabytes', 'gigabytes'] as const;
+export type SizeUnitLimit = (typeof SIZE_UNIT_LIMITS)[number];
+
+export function isSizeUnitLimit(value: unknown): value is SizeUnitLimit {
+  return typeof value === 'string' && (SIZE_UNIT_LIMITS as readonly string[]).includes(value);
+}
 
 export interface TransmissionProfile {
   id: string;

@@ -1,6 +1,17 @@
 import { useMemo, type MouseEvent as ReactMouseEvent } from 'react';
 import type { SizeUnitLimit, Torrent, TorrentColumnWidths, TorrentSortSettings, TorrentSortKey } from '@shared/types';
-import { byteUnitIndexForValue, formatBytes, formatDate, formatDuration, formatPercent, formatRate, formatRatio, statusText, torrentListSize } from '../utils';
+import {
+  byteUnitIndexForUnit,
+  byteUnitIndexForValue,
+  formatBytes,
+  formatDate,
+  formatDuration,
+  formatPercent,
+  formatRate,
+  formatRatio,
+  statusText,
+  torrentListSize
+} from '../utils';
 
 interface TorrentTableProps {
   torrents: Torrent[];
@@ -27,9 +38,9 @@ const columns: Array<{ key: TorrentSortKey; label: string; className?: string; w
 ];
 
 const maxSizeUnitIndexByLimit: Record<Exclude<SizeUnitLimit, 'auto'>, number> = {
-  bytes: 0,
-  megabytes: 2,
-  gigabytes: 3
+  bytes: byteUnitIndexForUnit('B'),
+  megabytes: byteUnitIndexForUnit('MB'),
+  gigabytes: byteUnitIndexForUnit('GB')
 };
 
 function classNames(...names: Array<string | undefined | false>): string | undefined {
