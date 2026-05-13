@@ -377,6 +377,11 @@ select:disabled {
   cursor: col-resize;
 }
 
+/* The final handle must stay inside the scroll container, otherwise its hit area creates a tiny permanent horizontal overflow. */
+.torrent-table th:last-child .column-resizer {
+  right: 0;
+}
+
 .column-resizer::after {
   position: absolute;
   top: 7px;
