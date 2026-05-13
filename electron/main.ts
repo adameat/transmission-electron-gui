@@ -102,7 +102,9 @@ function normalizeInterfaceTheme(theme: unknown): AppSettings['interfaceTheme'] 
 }
 
 function normalizeSizeUnitLimit(sizeUnitLimit: unknown): AppSettings['sizeUnitLimit'] {
-  return sizeUnitLimit === 'bytes' || sizeUnitLimit === 'megabytes' || sizeUnitLimit === 'gigabytes' ? sizeUnitLimit : 'auto';
+  return sizeUnitLimit === 'auto' || sizeUnitLimit === 'bytes' || sizeUnitLimit === 'megabytes' || sizeUnitLimit === 'gigabytes'
+    ? sizeUnitLimit
+    : 'auto';
 }
 
 function normalizeSettings(settings: Partial<StoredAppSettings>): AppSettings {

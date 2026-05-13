@@ -42,7 +42,7 @@ function sizeUnitIndexForLimit(autoUnitIndex: number, sizeUnitLimit: SizeUnitLim
     return autoUnitIndex;
   }
 
-  // This is a maximum unit, so small torrent lists can still use B/KB while larger lists can be capped at MB or GB.
+  // Bytes always renders as B; MB and GB are maximum units so smaller lists can still use a smaller unit.
   return Math.min(autoUnitIndex, maxSizeUnitIndexByLimit[sizeUnitLimit]);
 }
 
