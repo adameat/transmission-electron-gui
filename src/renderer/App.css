@@ -1099,10 +1099,6 @@ select:disabled {
   font-weight: 650;
 }
 
-.modal-options input[type='number'] {
-  width: 90px;
-}
-
 .form-error {
   margin: 0;
   color: var(--color-danger-text);

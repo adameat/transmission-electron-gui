@@ -8,7 +8,6 @@ export interface AddTorrentPayload {
   metainfo?: string;
   downloadDir?: string;
   paused: boolean;
-  peerLimit?: number;
 }
 
 export type AddTorrentProgress = (message: string) => void;
@@ -65,7 +64,6 @@ export function AddTorrentDialog({
   const [downloadDir, setDownloadDir] = useState(defaultDownloadDir);
   const [downloadDirPickerOpen, setDownloadDirPickerOpen] = useState(false);
   const [startNow, setStartNow] = useState(true);
-  const [peerLimit, setPeerLimit] = useState('');
   const [file, setFile] = useState<OpenedTorrentFile | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState('');
@@ -88,7 +86,6 @@ export function AddTorrentDialog({
       setDownloadDir(defaultDownloadDir);
       setDownloadDirPickerOpen(false);
       setStartNow(true);
-      setPeerLimit('');
       setFile(null);
       setSubmitting(false);
       setProgress('');
@@ -195,8 +192,7 @@ export function AddTorrentDialog({
           filename: file?.metainfo ? undefined : normalizedSource,
           metainfo: file?.metainfo,
           downloadDir: downloadDir.trim() || undefined,
-          paused: !startNow,
-          peerLimit: peerLimit ? Number(peerLimit) : undefined
+          paused: !startNow
         },
         setProgress
       );
@@ -435,10 +431,6 @@ export function AddTorrentDialog({
                 disabled={disabled}
               />
               Start torrent
-            </label>
-            <label>
-              <span>Peer limit</span>
-              <input type="number" min={0} value={peerLimit} onChange={(event) => setPeerLimit(event.target.value)} disabled={disabled} />
             </label>
           </div>
 
