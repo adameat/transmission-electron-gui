@@ -40,7 +40,9 @@ const defaultProfile: TransmissionProfile = {
   port: 9091,
   rpcPath: '/transmission/rpc',
   username: '',
-  password: ''
+  password: '',
+  directDownloadUrl: '',
+  directDownloadLocalPath: ''
 };
 
 const defaultSettings: AppSettings = {
@@ -96,7 +98,9 @@ function ensureProfile(profile: TransmissionProfile): TransmissionProfile {
     name: profile.name.trim() || 'Transmission daemon',
     host: profile.host.trim() || '127.0.0.1',
     port: Number(profile.port) || 9091,
-    rpcPath: profile.rpcPath.startsWith('/') ? profile.rpcPath : `/${profile.rpcPath || 'transmission/rpc'}`
+    rpcPath: profile.rpcPath.startsWith('/') ? profile.rpcPath : `/${profile.rpcPath || 'transmission/rpc'}`,
+    directDownloadUrl: (profile.directDownloadUrl ?? '').trim(),
+    directDownloadLocalPath: (profile.directDownloadLocalPath ?? '').trim()
   };
 }
 
@@ -191,6 +195,22 @@ function sameColumnWidths(firstColumnWidths: TorrentColumnWidths, secondColumnWi
     firstKeys.every(
       (columnKey) => Object.prototype.hasOwnProperty.call(secondColumnWidths, columnKey) && firstColumnWidths[columnKey] === secondColumnWidths[columnKey]
     )
+  );
+}
+
+function sameRpcConnection(firstProfile: TransmissionProfile | undefined, secondProfile: TransmissionProfile | undefined): boolean {
+  if (!firstProfile || !secondProfile) {
+    return firstProfile === secondProfile;
+  }
+
+  // Direct-download mapping and display names are local UI metadata; only RPC transport credentials require reconnecting.
+  return (
+    firstProfile.protocol === secondProfile.protocol &&
+    firstProfile.host === secondProfile.host &&
+    firstProfile.port === secondProfile.port &&
+    firstProfile.rpcPath === secondProfile.rpcPath &&
+    firstProfile.username === secondProfile.username &&
+    firstProfile.password === secondProfile.password
   );
 }
 
@@ -564,7 +584,7 @@ export default function App(): JSX.Element {
       : normalizedProfiles[0].id;
     const previousActiveProfile = currentSettings.profiles.find((savedProfile) => savedProfile.id === currentSettings.activeProfileId);
     const nextActiveProfile = normalizedProfiles.find((savedProfile) => savedProfile.id === nextActiveProfileId) ?? normalizedProfiles[0];
-    const activeProfileChanged = JSON.stringify(previousActiveProfile) !== JSON.stringify(nextActiveProfile);
+    const activeProfileChanged = !sameRpcConnection(previousActiveProfile, nextActiveProfile);
 
     await saveSettings({
       ...currentSettings,
@@ -833,6 +853,7 @@ export default function App(): JSX.Element {
           )}
           <DetailPane
             torrent={selectedTorrent}
+            profile={profile}
             session={session}
             stats={stats}
             activeTab={detailTab}

@@ -1,10 +1,12 @@
-import type { SessionStats, Torrent, TorrentFile, TorrentFileStat, TransmissionSession } from '@shared/types';
+import { useEffect } from 'react';
+import type { SessionStats, Torrent, TorrentFile, TorrentFileStat, TransmissionProfile, TransmissionSession } from '@shared/types';
 import { formatBytes, formatDate, formatDuration, formatPercent, formatRate, formatRatio, priorityLabel, statusText, torrentTotalSize } from '../utils';
 
-export type DetailTab = 'general' | 'files' | 'peers' | 'trackers' | 'stats';
+export type DetailTab = 'general' | 'files' | 'peers' | 'trackers' | 'stats' | 'direct';
 
 interface DetailPaneProps {
   torrent: Torrent | null;
+  profile: TransmissionProfile;
   session: TransmissionSession | null;
   stats: SessionStats | null;
   activeTab: DetailTab;
@@ -14,13 +16,26 @@ interface DetailPaneProps {
   onFilePriorityChange: (fileIndex: number, priority: -1 | 0 | 1) => void;
 }
 
-const tabs: Array<{ id: DetailTab; label: string }> = [
+const baseTabs: Array<{ id: DetailTab; label: string }> = [
   { id: 'general', label: 'General' },
   { id: 'files', label: 'Files' },
   { id: 'peers', label: 'Peers' },
   { id: 'trackers', label: 'Trackers' },
   { id: 'stats', label: 'Stats' }
 ];
+
+interface DirectDownloadLink {
+  label: string;
+  size: number;
+  url: string;
+}
+
+interface DirectDownloadState {
+  folderPath: string;
+  folderUrl: string | null;
+  links: DirectDownloadLink[];
+  message?: string;
+}
 
 function InfoGrid({ items }: { items: Array<[string, string]> }): JSX.Element {
   return (
@@ -40,8 +55,118 @@ function fileProgress(file: TorrentFile, stat?: TorrentFileStat): string {
   return file.length > 0 ? formatPercent(completed / file.length) : '0.0%';
 }
 
+function normalizeServerPath(value: string): string {
+  const normalized = value.trim().replace(/\\/g, '/').replace(/\/+/g, '/');
+  return normalized === '/' ? normalized : normalized.replace(/\/+$/g, '');
+}
+
+function pathSegments(value: string): string[] {
+  return value.replace(/\\/g, '/').split('/').filter(Boolean);
+}
+
+function hasUnsafePathSegment(value: string): boolean {
+  return pathSegments(value).some((segment) => segment === '.' || segment === '..');
+}
+
+function relativeDownloadPath(downloadDir: string, localRoot: string): string | null {
+  const normalizedDownloadDir = normalizeServerPath(downloadDir);
+  const normalizedLocalRoot = normalizeServerPath(localRoot);
+
+  if (!normalizedDownloadDir || !normalizedLocalRoot || hasUnsafePathSegment(normalizedDownloadDir) || hasUnsafePathSegment(normalizedLocalRoot)) {
+    return null;
+  }
+
+  if (normalizedLocalRoot === '/') {
+    return normalizedDownloadDir.replace(/^\/+/, '');
+  }
+
+  if (normalizedDownloadDir === normalizedLocalRoot) {
+    return '';
+  }
+
+  const rootPrefix = `${normalizedLocalRoot}/`;
+  return normalizedDownloadDir.startsWith(rootPrefix) ? normalizedDownloadDir.slice(rootPrefix.length) : null;
+}
+
+function safeEncodedPath(...paths: string[]): string | null {
+  const segments = paths.flatMap(pathSegments);
+  // The URL API normalizes literal . and .. segments when assigning pathname, so reject them before building external links.
+  if (segments.some((segment) => segment === '.' || segment === '..')) {
+    return null;
+  }
+
+  return segments.map(encodeURIComponent).join('/');
+}
+
+function directDownloadUrl(rootUrl: string, ...paths: string[]): string | null {
+  try {
+    const url = new URL(rootUrl);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null;
+    }
+
+    const rootPath = url.pathname.replace(/\/+$/g, '');
+    const suffix = safeEncodedPath(...paths);
+    if (suffix === null) {
+      return null;
+    }
+
+    url.pathname = suffix ? `${rootPath}/${suffix}` : `${rootPath}/`;
+    url.hash = '';
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function buildDirectDownloadState(torrent: Torrent, profile: TransmissionProfile): DirectDownloadState | null {
+  const rootUrl = profile.directDownloadUrl.trim();
+  const localRoot = profile.directDownloadLocalPath.trim();
+
+  if (!rootUrl || !localRoot || torrent.percentDone < 1) {
+    return null;
+  }
+
+  const relativePath = relativeDownloadPath(torrent.downloadDir, localRoot);
+  if (relativePath === null) {
+    return {
+      folderPath: torrent.downloadDir || 'Unknown',
+      folderUrl: null,
+      links: [],
+      message: 'Download folder is outside the configured local path root.'
+    };
+  }
+
+  const folderUrl = directDownloadUrl(rootUrl, relativePath);
+  if (!folderUrl) {
+    return {
+      folderPath: relativePath || '/',
+      folderUrl: null,
+      links: [],
+      message: 'Direct download URL must be HTTP or HTTPS.'
+    };
+  }
+
+  const fileStats = torrent.fileStats ?? [];
+  const links = (torrent.files ?? []).flatMap((file, fileIndex) => {
+    if (fileStats[fileIndex]?.wanted === false) {
+      return [];
+    }
+
+    const url = directDownloadUrl(rootUrl, relativePath, file.name);
+    return url ? [{ label: file.name, size: file.length, url }] : [];
+  });
+
+  return {
+    folderPath: relativePath || '/',
+    folderUrl,
+    links
+  };
+}
+
 export function DetailPane({
   torrent,
+  profile,
   session,
   stats,
   activeTab,
@@ -50,11 +175,21 @@ export function DetailPane({
   onFileWantedChange,
   onFilePriorityChange
 }: DetailPaneProps): JSX.Element {
+  const directDownloadState = torrent ? buildDirectDownloadState(torrent, profile) : null;
+  const tabs = directDownloadState ? [...baseTabs, { id: 'direct' as const, label: 'Download' }] : baseTabs;
+  const activeDetailTab = tabs.some((tab) => tab.id === activeTab) ? activeTab : 'general';
+
+  useEffect(() => {
+    if (activeDetailTab !== activeTab) {
+      onTabChange(activeDetailTab);
+    }
+  }, [activeDetailTab, activeTab, onTabChange]);
+
   return (
     <section className="detail-pane" aria-label="Torrent details">
       <nav className="detail-tabs" aria-label="Details tabs">
         {tabs.map((tab) => (
-          <button key={tab.id} type="button" className={tab.id === activeTab ? 'active' : undefined} onClick={() => onTabChange(tab.id)}>
+          <button key={tab.id} type="button" className={tab.id === activeDetailTab ? 'active' : undefined} onClick={() => onTabChange(tab.id)}>
             {tab.label}
           </button>
         ))}
@@ -62,8 +197,8 @@ export function DetailPane({
 
       <div className="detail-content">
         {!torrent ? <div className="empty-state">No torrent selected</div> : null}
-        {torrent && activeTab === 'general' ? <GeneralTab torrent={torrent} session={session} /> : null}
-        {torrent && activeTab === 'files' ? (
+        {torrent && activeDetailTab === 'general' ? <GeneralTab torrent={torrent} session={session} /> : null}
+        {torrent && activeDetailTab === 'files' ? (
           <FilesTab
             torrent={torrent}
             busy={busy}
@@ -71,9 +206,10 @@ export function DetailPane({
             onFilePriorityChange={onFilePriorityChange}
           />
         ) : null}
-        {torrent && activeTab === 'peers' ? <PeersTab torrent={torrent} /> : null}
-        {torrent && activeTab === 'trackers' ? <TrackersTab torrent={torrent} /> : null}
-        {torrent && activeTab === 'stats' ? <StatsTab torrent={torrent} stats={stats} /> : null}
+        {torrent && activeDetailTab === 'peers' ? <PeersTab torrent={torrent} /> : null}
+        {torrent && activeDetailTab === 'trackers' ? <TrackersTab torrent={torrent} /> : null}
+        {torrent && activeDetailTab === 'stats' ? <StatsTab torrent={torrent} stats={stats} /> : null}
+        {torrent && activeDetailTab === 'direct' && directDownloadState ? <DirectDownloadTab state={directDownloadState} /> : null}
       </div>
     </section>
   );
@@ -277,6 +413,52 @@ function StatsTab({ torrent, stats }: { torrent: Torrent; stats: SessionStats | 
           ['Cumulative uploaded', formatBytes(stats?.cumulativeStats?.uploadedBytes ?? 0)]
         ]}
       />
+    </div>
+  );
+}
+
+function DirectDownloadTab({ state }: { state: DirectDownloadState }): JSX.Element {
+  if (state.message) {
+    return <div className="empty-state">{state.message}</div>;
+  }
+
+  return (
+    <div className="direct-download-layout">
+      <div className="direct-download-panel">
+        <h3>Download folder</h3>
+        {state.folderUrl ? (
+          <a className="direct-download-link" href={state.folderUrl} target="_blank" rel="noreferrer" title={state.folderUrl}>
+            {state.folderPath}
+          </a>
+        ) : null}
+      </div>
+
+      {state.links.length > 0 ? (
+        <div className="subtable-wrap direct-download-table-wrap">
+          <table className="subtable">
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Size</th>
+                <th>Link</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.links.map((link) => (
+                <tr key={link.url}>
+                  <td className="path-cell">{link.label}</td>
+                  <td>{formatBytes(link.size)}</td>
+                  <td>
+                    <a className="direct-download-link" href={link.url} target="_blank" rel="noreferrer" title={link.url}>
+                      Open
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </div>
   );
 }

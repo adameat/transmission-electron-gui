@@ -20,7 +20,9 @@ function createProfile(): TransmissionProfile {
     port: 9091,
     rpcPath: '/transmission/rpc',
     username: '',
-    password: ''
+    password: '',
+    directDownloadUrl: '',
+    directDownloadLocalPath: ''
   };
 }
 
@@ -31,8 +33,23 @@ function normalizeProfile(profile: TransmissionProfile): TransmissionProfile {
     name: profile.name.trim() || 'Transmission daemon',
     host: profile.host.trim(),
     port: Number(profile.port) || 9091,
-    rpcPath: profile.rpcPath.startsWith('/') ? profile.rpcPath : `/${profile.rpcPath || 'transmission/rpc'}`
+    rpcPath: profile.rpcPath.startsWith('/') ? profile.rpcPath : `/${profile.rpcPath || 'transmission/rpc'}`,
+    directDownloadUrl: (profile.directDownloadUrl ?? '').trim(),
+    directDownloadLocalPath: (profile.directDownloadLocalPath ?? '').trim()
   };
+}
+
+function isValidDirectDownloadUrl(value: string): boolean {
+  if (!value) {
+    return true;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 export function ConnectionSettingsDialog({
@@ -53,7 +70,7 @@ export function ConnectionSettingsDialog({
       return;
     }
 
-    const nextProfiles = profiles.length ? profiles.map((profile) => ({ ...profile })) : [createProfile()];
+    const nextProfiles = profiles.length ? profiles.map((profile) => normalizeProfile(profile)) : [createProfile()];
     setDraftProfiles(nextProfiles);
     setSelectedId(nextProfiles.find((profile) => profile.id === activeProfileId)?.id ?? nextProfiles[0].id);
     setSaving(false);
@@ -105,6 +122,16 @@ export function ConnectionSettingsDialog({
 
     if (new Set(names).size !== names.length) {
       setError('Connection names must be unique.');
+      return;
+    }
+
+    if (normalizedProfiles.some((profile) => Boolean(profile.directDownloadUrl) !== Boolean(profile.directDownloadLocalPath))) {
+      setError('Direct download URL and local path must be set together.');
+      return;
+    }
+
+    if (normalizedProfiles.some((profile) => !isValidDirectDownloadUrl(profile.directDownloadUrl))) {
+      setError('Direct download URL must be an HTTP or HTTPS URL.');
       return;
     }
 
@@ -207,6 +234,26 @@ export function ConnectionSettingsDialog({
                   />
                 </label>
               </div>
+
+              <fieldset className="settings-group connection-settings-group">
+                <legend>Direct downloads</legend>
+                <label className="stacked-field wide-field">
+                  <span>URL root</span>
+                  <input
+                    value={selectedProfile.directDownloadUrl}
+                    onChange={(event) => updateSelected({ directDownloadUrl: event.target.value })}
+                    disabled={disabled}
+                  />
+                </label>
+                <label className="stacked-field wide-field">
+                  <span>Local path root</span>
+                  <input
+                    value={selectedProfile.directDownloadLocalPath}
+                    onChange={(event) => updateSelected({ directDownloadLocalPath: event.target.value })}
+                    disabled={disabled}
+                  />
+                </label>
+              </fieldset>
 
               <button type="button" className="command-button danger delete-connection" onClick={deleteProfile} disabled={disabled}>
                 <Trash2 size={17} aria-hidden="true" />

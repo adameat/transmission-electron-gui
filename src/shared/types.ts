@@ -16,6 +16,8 @@ export interface TransmissionProfile {
   rpcPath: string;
   username: string;
   password: string;
+  directDownloadUrl: string;
+  directDownloadLocalPath: string;
 }
 
 export interface AppSettings {

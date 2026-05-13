@@ -712,6 +712,36 @@ select:disabled {
   overflow-wrap: anywhere;
 }
 
+.direct-download-layout {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.direct-download-panel {
+  min-width: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.direct-download-panel h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.direct-download-link {
+  color: var(--color-accent-text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.direct-download-table-wrap {
+  min-height: 120px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+}
+
 .files-table th:first-child,
 .files-table td:first-child {
   width: 84px;
@@ -933,6 +963,10 @@ select:disabled {
   align-content: start;
   gap: 12px;
   min-width: 0;
+}
+
+.connection-settings-group {
+  gap: 10px;
 }
 
 .form-grid {

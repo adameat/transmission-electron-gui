@@ -32,7 +32,9 @@ const defaultProfile: TransmissionProfile = {
   port: 9091,
   rpcPath: '/transmission/rpc',
   username: '',
-  password: ''
+  password: '',
+  directDownloadUrl: '',
+  directDownloadLocalPath: ''
 };
 
 const torrentColumnKeys = new Set(['name', 'size', 'done', 'status', 'down', 'up', 'eta', 'ratio', 'peers', 'added']);
@@ -94,7 +96,9 @@ function normalizeProfile(profile: Partial<StoredTransmissionProfile>): Transmis
     port: Number(profile.port) || 9091,
     rpcPath: profile.rpcPath?.startsWith('/') ? profile.rpcPath : `/${profile.rpcPath || 'transmission/rpc'}`,
     username: profile.username || '',
-    password: decryptStoredPassword(profile)
+    password: decryptStoredPassword(profile),
+    directDownloadUrl: profile.directDownloadUrl?.trim() || '',
+    directDownloadLocalPath: profile.directDownloadLocalPath?.trim() || ''
   };
 }
 
@@ -196,6 +200,19 @@ function buildRpcUrl(profile: TransmissionProfile): string {
 function resolvePreloadPath(): string {
   const candidates = [path.join(__dirname, '../preload/index.mjs'), path.join(__dirname, '../preload/index.js')];
   return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
+}
+
+function openExternalHttpUrl(url: string): void {
+  try {
+    const externalUrl = new URL(url);
+    if (externalUrl.protocol !== 'http:' && externalUrl.protocol !== 'https:') {
+      return;
+    }
+
+    shell.openExternal(externalUrl.href).catch((error) => console.warn('Unable to open external URL:', error));
+  } catch (error) {
+    console.warn('Unable to parse external URL:', error);
+  }
 }
 
 function buildHeaders(profile: TransmissionProfile): Record<string, string> {
@@ -322,7 +339,7 @@ function createWindow(): void {
   mainWindow.once('ready-to-show', () => mainWindow?.show());
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url).catch((error) => console.warn('Unable to open external URL:', error));
+    openExternalHttpUrl(url);
     return { action: 'deny' };
   });
 
