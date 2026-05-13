@@ -1,4 +1,5 @@
 export type RpcProtocol = 'http' | 'https';
+export type InterfaceTheme = 'system' | 'light' | 'dark';
 
 export interface TransmissionProfile {
   id: string;
@@ -14,6 +15,7 @@ export interface TransmissionProfile {
 export interface AppSettings {
   profiles: TransmissionProfile[];
   activeProfileId: string;
+  interfaceTheme: InterfaceTheme;
   refreshIntervalSeconds: number;
   torrentSort: TorrentSortSettings;
   torrentColumnWidths: TorrentColumnWidths;
