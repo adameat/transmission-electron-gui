@@ -5,6 +5,7 @@ import type {
   DaemonSettingsPayload,
   InterfaceTheme,
   SessionStats,
+  SizeUnitLimit,
   Torrent,
   TorrentAddResult,
   TorrentColumnWidths,
@@ -45,6 +46,7 @@ const defaultSettings: AppSettings = {
   profiles: [defaultProfile],
   activeProfileId: defaultProfile.id,
   interfaceTheme: 'system',
+  sizeUnitLimit: 'auto',
   refreshIntervalSeconds: 5,
   torrentSort: {
     key: 'name',
@@ -195,6 +197,12 @@ function normalizeInterfaceTheme(theme: unknown, fallback: InterfaceTheme = 'sys
   return theme === 'system' || theme === 'light' || theme === 'dark' ? theme : fallback;
 }
 
+function normalizeSizeUnitLimit(sizeUnitLimit: unknown, fallback: SizeUnitLimit = 'auto'): SizeUnitLimit {
+  return sizeUnitLimit === 'auto' || sizeUnitLimit === 'bytes' || sizeUnitLimit === 'megabytes' || sizeUnitLimit === 'gigabytes'
+    ? sizeUnitLimit
+    : fallback;
+}
+
 function normalizeRendererSettings(settings: Partial<AppSettings>, fallbackSettings = defaultSettings): AppSettings {
   return {
     ...fallbackSettings,
@@ -202,6 +210,7 @@ function normalizeRendererSettings(settings: Partial<AppSettings>, fallbackSetti
     profiles: settings.profiles?.length ? settings.profiles : fallbackSettings.profiles,
     activeProfileId: settings.activeProfileId || fallbackSettings.activeProfileId,
     interfaceTheme: normalizeInterfaceTheme(settings.interfaceTheme, fallbackSettings.interfaceTheme),
+    sizeUnitLimit: normalizeSizeUnitLimit(settings.sizeUnitLimit, fallbackSettings.sizeUnitLimit),
     refreshIntervalSeconds: Number(settings.refreshIntervalSeconds) || fallbackSettings.refreshIntervalSeconds,
     torrentSort: settings.torrentSort ?? fallbackSettings.torrentSort,
     torrentColumnWidths: settings.torrentColumnWidths ?? fallbackSettings.torrentColumnWidths,
@@ -574,10 +583,11 @@ export default function App(): JSX.Element {
     setMessage('Connections saved');
   }
 
-  async function saveAppSettings(interfaceTheme: InterfaceTheme): Promise<void> {
+  async function saveAppSettings(interfaceTheme: InterfaceTheme, sizeUnitLimit: SizeUnitLimit): Promise<void> {
     await saveSettings({
       ...settingsRef.current,
-      interfaceTheme
+      interfaceTheme,
+      sizeUnitLimit
     });
     setMessage('App settings saved');
   }
@@ -816,6 +826,7 @@ export default function App(): JSX.Element {
               selectedId={selectedId}
               sort={sort}
               columnWidths={columnWidths}
+              sizeUnitLimit={settings.sizeUnitLimit}
               onSelect={setSelectedId}
               onSortChange={changeSort}
               onColumnResize={changeColumnWidth}
@@ -853,6 +864,7 @@ export default function App(): JSX.Element {
       <AppSettingsDialog
         open={appSettingsOpen}
         interfaceTheme={effectiveInterfaceTheme}
+        sizeUnitLimit={settings.sizeUnitLimit}
         busy={busy}
         onClose={() => setAppSettingsOpen(false)}
         onSave={saveAppSettings}

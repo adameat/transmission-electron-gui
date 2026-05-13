@@ -101,6 +101,10 @@ function normalizeInterfaceTheme(theme: unknown): AppSettings['interfaceTheme'] 
   return theme === 'light' || theme === 'dark' ? theme : 'system';
 }
 
+function normalizeSizeUnitLimit(sizeUnitLimit: unknown): AppSettings['sizeUnitLimit'] {
+  return sizeUnitLimit === 'bytes' || sizeUnitLimit === 'megabytes' || sizeUnitLimit === 'gigabytes' ? sizeUnitLimit : 'auto';
+}
+
 function normalizeSettings(settings: Partial<StoredAppSettings>): AppSettings {
   const profiles = settings.profiles?.length
     ? settings.profiles.map((profile) => normalizeProfile(profile))
@@ -119,6 +123,7 @@ function normalizeSettings(settings: Partial<StoredAppSettings>): AppSettings {
     profiles,
     activeProfileId: settings.activeProfileId || profiles[0].id,
     interfaceTheme: normalizeInterfaceTheme(settings.interfaceTheme),
+    sizeUnitLimit: normalizeSizeUnitLimit(settings.sizeUnitLimit),
     refreshIntervalSeconds: Number(settings.refreshIntervalSeconds) || 5,
     torrentSort: {
       key: settings.torrentSort?.key || 'name',

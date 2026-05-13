@@ -1,5 +1,6 @@
 export type RpcProtocol = 'http' | 'https';
 export type InterfaceTheme = 'system' | 'light' | 'dark';
+export type SizeUnitLimit = 'auto' | 'bytes' | 'megabytes' | 'gigabytes';
 
 export interface TransmissionProfile {
   id: string;
@@ -16,6 +17,7 @@ export interface AppSettings {
   profiles: TransmissionProfile[];
   activeProfileId: string;
   interfaceTheme: InterfaceTheme;
+  sizeUnitLimit: SizeUnitLimit;
   refreshIntervalSeconds: number;
   torrentSort: TorrentSortSettings;
   torrentColumnWidths: TorrentColumnWidths;
