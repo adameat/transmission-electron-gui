@@ -1,5 +1,5 @@
 import { FileUp, FolderInput, Link, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { OpenedTorrentFile } from '@shared/types';
 import { errorMessage } from '../utils';
 
@@ -17,6 +17,7 @@ interface AddTorrentDialogProps {
   open: boolean;
   busy: boolean;
   defaultDownloadDir: string;
+  downloadDirSuggestions: string[];
   onClose: () => void;
   onSubmit: (payload: AddTorrentPayload, reportProgress: AddTorrentProgress) => Promise<void>;
 }
@@ -30,7 +31,15 @@ function normalizeSource(source: string): string {
   return trimmedSource;
 }
 
-export function AddTorrentDialog({ open, busy, defaultDownloadDir, onClose, onSubmit }: AddTorrentDialogProps): JSX.Element | null {
+export function AddTorrentDialog({
+  open,
+  busy,
+  defaultDownloadDir,
+  downloadDirSuggestions,
+  onClose,
+  onSubmit
+}: AddTorrentDialogProps): JSX.Element | null {
+  const downloadDirListId = useId();
   const [source, setSource] = useState('');
   const [downloadDir, setDownloadDir] = useState(defaultDownloadDir);
   const [startNow, setStartNow] = useState(true);
@@ -128,7 +137,19 @@ export function AddTorrentDialog({ open, busy, defaultDownloadDir, onClose, onSu
             <span>Download folder</span>
             <div className="source-row">
               <FolderInput size={17} aria-hidden="true" />
-              <input value={downloadDir} onChange={(event) => setDownloadDir(event.target.value)} disabled={disabled} />
+              <input
+                value={downloadDir}
+                onChange={(event) => setDownloadDir(event.target.value)}
+                disabled={disabled}
+                list={downloadDirSuggestions.length > 0 ? downloadDirListId : undefined}
+              />
+              {downloadDirSuggestions.length > 0 ? (
+                <datalist id={downloadDirListId}>
+                  {downloadDirSuggestions.map((suggestion) => (
+                    <option key={suggestion} value={suggestion} />
+                  ))}
+                </datalist>
+              ) : null}
             </div>
           </label>
 
