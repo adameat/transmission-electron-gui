@@ -1,4 +1,4 @@
-import { Pause, Play, Plus, RadioTower, RefreshCw, Settings2, ShieldCheck, Trash2 } from 'lucide-react';
+import { Pause, Play, Plus, RadioTower, RefreshCw, Settings2, ShieldCheck, SlidersHorizontal, Trash2 } from 'lucide-react';
 
 interface ToolbarProps {
   connected: boolean;
@@ -12,6 +12,7 @@ interface ToolbarProps {
   onVerify: () => void;
   onReannounce: () => void;
   onOpenSettings: () => void;
+  onOpenDaemonSettings: () => void;
 }
 
 export function Toolbar({
@@ -25,7 +26,8 @@ export function Toolbar({
   onRemove,
   onVerify,
   onReannounce,
-  onOpenSettings
+  onOpenSettings,
+  onOpenDaemonSettings
 }: ToolbarProps): JSX.Element {
   return (
     <section className="toolbar" aria-label="Torrent actions">
@@ -58,6 +60,10 @@ export function Toolbar({
       <button type="button" className="tool-button" title="App settings" onClick={onOpenSettings} disabled={busy}>
         <Settings2 size={18} aria-hidden="true" />
         <span>Settings</span>
+      </button>
+      <button type="button" className="tool-button" title="Daemon settings" onClick={onOpenDaemonSettings} disabled={!connected || busy}>
+        <SlidersHorizontal size={18} aria-hidden="true" />
+        <span>Daemon</span>
       </button>
       <button type="button" className="tool-button" title="Refresh" onClick={onRefresh} disabled={!connected || busy}>
         <RefreshCw size={18} aria-hidden="true" />

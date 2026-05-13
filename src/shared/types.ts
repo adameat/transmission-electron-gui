@@ -67,12 +67,31 @@ export interface TransmissionSession {
   'speed-limit-up'?: number;
   'speed-limit-up-enabled'?: boolean;
   'alt-speed-enabled'?: boolean;
+  seedRatioLimit?: number;
+  seedRatioLimited?: boolean;
   'dht-enabled'?: boolean;
   'pex-enabled'?: boolean;
   'lpd-enabled'?: boolean;
-  encryption?: string;
+  encryption?: 'tolerated' | 'preferred' | 'required' | string;
   [key: string]: unknown;
 }
+
+export type EncryptionMode = 'tolerated' | 'preferred' | 'required';
+
+export type DaemonSettingsPayload = Record<string, unknown> & {
+  'download-dir': string;
+  'speed-limit-down-enabled': boolean;
+  'speed-limit-down': number;
+  'speed-limit-up-enabled': boolean;
+  'speed-limit-up': number;
+  'alt-speed-enabled': boolean;
+  seedRatioLimited: boolean;
+  seedRatioLimit: number;
+  'dht-enabled': boolean;
+  'pex-enabled': boolean;
+  'lpd-enabled': boolean;
+  encryption: EncryptionMode;
+};
 
 export interface SessionStats {
   activeTorrentCount: number;

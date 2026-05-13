@@ -843,6 +843,10 @@ select:disabled {
   width: min(520px, calc(100vw - 32px));
 }
 
+.daemon-settings-modal {
+  width: min(760px, calc(100vw - 32px));
+}
+
 .modal-header,
 .modal-footer {
   display: flex;
@@ -958,6 +962,10 @@ select:disabled {
   gap: 14px;
 }
 
+.daemon-settings-body {
+  gap: 16px;
+}
+
 .settings-group {
   display: grid;
   gap: 8px;
@@ -972,6 +980,27 @@ select:disabled {
   color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 700;
+}
+
+.settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.settings-toggle input {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}
+
+.daemon-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .theme-options {
@@ -1153,6 +1182,10 @@ select:disabled {
   }
 
   .two-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .daemon-toggle-grid {
     grid-template-columns: 1fr;
   }
 }
