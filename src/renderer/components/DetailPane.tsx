@@ -176,7 +176,7 @@ export function DetailPane({
   onFilePriorityChange
 }: DetailPaneProps): JSX.Element {
   const directDownloadState = torrent ? buildDirectDownloadState(torrent, profile) : null;
-  const tabs = directDownloadState ? [...baseTabs, { id: 'direct' as const, label: 'Direct' }] : baseTabs;
+  const tabs = directDownloadState ? [...baseTabs, { id: 'direct' as const, label: 'Download' }] : baseTabs;
   const activeDetailTab = tabs.some((tab) => tab.id === activeTab) ? activeTab : 'general';
 
   useEffect(() => {
