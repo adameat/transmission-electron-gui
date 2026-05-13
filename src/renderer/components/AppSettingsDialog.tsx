@@ -1,13 +1,15 @@
 import { Monitor, Moon, Sun, X } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import type { InterfaceTheme } from '@shared/types';
+import { isSizeUnitLimit, SIZE_UNIT_LIMITS } from '@shared/types';
+import type { InterfaceTheme, SizeUnitLimit } from '@shared/types';
 
 interface AppSettingsDialogProps {
   open: boolean;
   interfaceTheme: InterfaceTheme;
+  sizeUnitLimit: SizeUnitLimit;
   busy: boolean;
   onClose: () => void;
-  onSave: (interfaceTheme: InterfaceTheme) => Promise<void>;
+  onSave: (interfaceTheme: InterfaceTheme, sizeUnitLimit: SizeUnitLimit) => Promise<void>;
 }
 
 const themeOptions: Array<{ value: InterfaceTheme; label: string; icon: JSX.Element }> = [
@@ -16,8 +18,18 @@ const themeOptions: Array<{ value: InterfaceTheme; label: string; icon: JSX.Elem
   { value: 'dark', label: 'Dark', icon: <Moon size={17} aria-hidden="true" /> }
 ];
 
-export function AppSettingsDialog({ open, interfaceTheme, busy, onClose, onSave }: AppSettingsDialogProps): JSX.Element | null {
+const sizeUnitLabels: Record<SizeUnitLimit, string> = {
+  auto: 'Auto',
+  bytes: 'Bytes',
+  megabytes: 'MB',
+  gigabytes: 'GB'
+};
+
+const sizeUnitOptions = SIZE_UNIT_LIMITS.map((value) => ({ value, label: sizeUnitLabels[value] }));
+
+export function AppSettingsDialog({ open, interfaceTheme, sizeUnitLimit, busy, onClose, onSave }: AppSettingsDialogProps): JSX.Element | null {
   const [draftTheme, setDraftTheme] = useState<InterfaceTheme>(interfaceTheme);
+  const [draftSizeUnitLimit, setDraftSizeUnitLimit] = useState<SizeUnitLimit>(sizeUnitLimit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const themeOptionRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -28,9 +40,10 @@ export function AppSettingsDialog({ open, interfaceTheme, busy, onClose, onSave 
     }
 
     setDraftTheme(interfaceTheme);
+    setDraftSizeUnitLimit(sizeUnitLimit);
     setSaving(false);
     setError('');
-  }, [interfaceTheme, open]);
+  }, [interfaceTheme, open, sizeUnitLimit]);
 
   if (!open) {
     return null;
@@ -68,7 +81,7 @@ export function AppSettingsDialog({ open, interfaceTheme, busy, onClose, onSave 
     setSaving(true);
     setError('');
     try {
-      await onSave(draftTheme);
+      await onSave(draftTheme, draftSizeUnitLimit);
       onClose();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : String(saveError));
@@ -112,6 +125,25 @@ export function AppSettingsDialog({ open, interfaceTheme, busy, onClose, onSave 
                 </button>
               ))}
             </div>
+          </fieldset>
+
+          <fieldset className="settings-group">
+            <legend>Size column</legend>
+            <label className="stacked-field">
+              <span>Maximum unit</span>
+              <select
+                value={draftSizeUnitLimit}
+                aria-label="Size column maximum unit"
+                onChange={(event) => setDraftSizeUnitLimit(isSizeUnitLimit(event.target.value) ? event.target.value : 'auto')}
+                disabled={disabled}
+              >
+                {sizeUnitOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </fieldset>
         </div>
 

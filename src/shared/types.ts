@@ -1,5 +1,11 @@
 export type RpcProtocol = 'http' | 'https';
 export type InterfaceTheme = 'system' | 'light' | 'dark';
+export const SIZE_UNIT_LIMITS = ['auto', 'bytes', 'megabytes', 'gigabytes'] as const;
+export type SizeUnitLimit = (typeof SIZE_UNIT_LIMITS)[number];
+
+export function isSizeUnitLimit(value: unknown): value is SizeUnitLimit {
+  return typeof value === 'string' && (SIZE_UNIT_LIMITS as readonly string[]).includes(value);
+}
 
 export interface TransmissionProfile {
   id: string;
@@ -16,6 +22,7 @@ export interface AppSettings {
   profiles: TransmissionProfile[];
   activeProfileId: string;
   interfaceTheme: InterfaceTheme;
+  sizeUnitLimit: SizeUnitLimit;
   refreshIntervalSeconds: number;
   torrentSort: TorrentSortSettings;
   torrentColumnWidths: TorrentColumnWidths;

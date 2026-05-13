@@ -5,15 +5,16 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeDownloadDirs } from '../src/shared/downloadDirs';
-import type {
-  AppSettings,
-  ConnectionResult,
-  OpenedTorrentFile,
-  RpcEnvelope,
-  RpcRequest,
-  SessionStats,
-  TransmissionProfile,
-  TransmissionSession
+import {
+  isSizeUnitLimit,
+  type AppSettings,
+  type ConnectionResult,
+  type OpenedTorrentFile,
+  type RpcEnvelope,
+  type RpcRequest,
+  type SessionStats,
+  type TransmissionProfile,
+  type TransmissionSession
 } from '../src/shared/types';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -101,6 +102,10 @@ function normalizeInterfaceTheme(theme: unknown): AppSettings['interfaceTheme'] 
   return theme === 'light' || theme === 'dark' ? theme : 'system';
 }
 
+function normalizeSizeUnitLimit(sizeUnitLimit: unknown): AppSettings['sizeUnitLimit'] {
+  return isSizeUnitLimit(sizeUnitLimit) ? sizeUnitLimit : 'auto';
+}
+
 function normalizeSettings(settings: Partial<StoredAppSettings>): AppSettings {
   const profiles = settings.profiles?.length
     ? settings.profiles.map((profile) => normalizeProfile(profile))
@@ -119,6 +124,7 @@ function normalizeSettings(settings: Partial<StoredAppSettings>): AppSettings {
     profiles,
     activeProfileId: settings.activeProfileId || profiles[0].id,
     interfaceTheme: normalizeInterfaceTheme(settings.interfaceTheme),
+    sizeUnitLimit: normalizeSizeUnitLimit(settings.sizeUnitLimit),
     refreshIntervalSeconds: Number(settings.refreshIntervalSeconds) || 5,
     torrentSort: {
       key: settings.torrentSort?.key || 'name',

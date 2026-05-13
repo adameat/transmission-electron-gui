@@ -1,12 +1,24 @@
 import { useMemo, type MouseEvent as ReactMouseEvent } from 'react';
-import type { Torrent, TorrentColumnWidths, TorrentSortSettings, TorrentSortKey } from '@shared/types';
-import { byteUnitIndexForValue, formatBytes, formatDate, formatDuration, formatPercent, formatRate, formatRatio, statusText, torrentListSize } from '../utils';
+import type { SizeUnitLimit, Torrent, TorrentColumnWidths, TorrentSortSettings, TorrentSortKey } from '@shared/types';
+import {
+  byteUnitIndexForUnit,
+  byteUnitIndexForValue,
+  formatBytes,
+  formatDate,
+  formatDuration,
+  formatPercent,
+  formatRate,
+  formatRatio,
+  statusText,
+  torrentListSize
+} from '../utils';
 
 interface TorrentTableProps {
   torrents: Torrent[];
   selectedId: number | null;
   sort: TorrentSortSettings;
   columnWidths: TorrentColumnWidths;
+  sizeUnitLimit: SizeUnitLimit;
   onSelect: (torrentId: number) => void;
   onSortChange: (sortKey: TorrentSortKey) => void;
   onColumnResize: (sortKey: TorrentSortKey, width: number, commit: boolean) => void;
@@ -25,18 +37,46 @@ const columns: Array<{ key: TorrentSortKey; label: string; className?: string; w
   { key: 'added', label: 'Added', width: 148, minWidth: 132, align: 'right' }
 ];
 
+const maxSizeUnitIndexByLimit: Record<Exclude<SizeUnitLimit, 'auto'>, number> = {
+  bytes: byteUnitIndexForUnit('B'),
+  megabytes: byteUnitIndexForUnit('MB'),
+  gigabytes: byteUnitIndexForUnit('GB')
+};
+
 function classNames(...names: Array<string | undefined | false>): string | undefined {
   const filteredNames = names.filter(Boolean);
   return filteredNames.length > 0 ? filteredNames.join(' ') : undefined;
 }
 
-export function TorrentTable({ torrents, selectedId, sort, columnWidths, onSelect, onSortChange, onColumnResize }: TorrentTableProps): JSX.Element {
+function sizeUnitIndexForLimit(autoUnitIndex: number, sizeUnitLimit: SizeUnitLimit): number {
+  if (sizeUnitLimit === 'auto') {
+    return autoUnitIndex;
+  }
+
+  // Bytes always renders as B; MB and GB are maximum units so smaller lists can still use a smaller unit.
+  return Math.min(autoUnitIndex, maxSizeUnitIndexByLimit[sizeUnitLimit]);
+}
+
+function sizeFractionDigits(sizeUnitLimit: SizeUnitLimit): number {
+  return sizeUnitLimit === 'bytes' || sizeUnitLimit === 'megabytes' ? 0 : 1;
+}
+
+export function TorrentTable({
+  torrents,
+  selectedId,
+  sort,
+  columnWidths,
+  sizeUnitLimit,
+  onSelect,
+  onSortChange,
+  onColumnResize
+}: TorrentTableProps): JSX.Element {
   const resolvedColumns = columns.map((column) => ({
     ...column,
     width: Math.max(column.minWidth, columnWidths[column.key] ?? column.width)
   }));
   const tableWidth = resolvedColumns.reduce((totalWidth, column) => totalWidth + column.width, 0);
-  const { sizeUnitIndex, downloadRateUnitIndex, uploadRateUnitIndex } = useMemo(() => {
+  const { sizeUnitIndex, sizeFractionDigitCount, downloadRateUnitIndex, uploadRateUnitIndex } = useMemo(() => {
     let maxSize = 0;
     let maxDownloadRate = 0;
     let maxUploadRate = 0;
@@ -60,11 +100,12 @@ export function TorrentTable({ torrents, selectedId, sort, columnWidths, onSelec
     }
 
     return {
-      sizeUnitIndex: byteUnitIndexForValue(maxSize),
+      sizeUnitIndex: sizeUnitIndexForLimit(byteUnitIndexForValue(maxSize), sizeUnitLimit),
+      sizeFractionDigitCount: sizeFractionDigits(sizeUnitLimit),
       downloadRateUnitIndex: byteUnitIndexForValue(maxDownloadRate),
       uploadRateUnitIndex: byteUnitIndexForValue(maxUploadRate)
     };
-  }, [torrents]);
+  }, [sizeUnitLimit, torrents]);
 
   function startResize(event: ReactMouseEvent, sortKey: TorrentSortKey, startWidth: number, minWidth: number): void {
     event.preventDefault();
@@ -145,7 +186,7 @@ export function TorrentTable({ torrents, selectedId, sort, columnWidths, onSelec
                 <span className="torrent-name">{torrent.name}</span>
                 {torrent.error ? <span className="torrent-error">{torrent.errorString || 'Error'}</span> : null}
               </td>
-              <td className="number-cell">{formatBytes(torrentListSize(torrent), 1, sizeUnitIndex)}</td>
+              <td className="number-cell">{formatBytes(torrentListSize(torrent), sizeFractionDigitCount, sizeUnitIndex)}</td>
               <td className="progress-cell done-cell">
                 <div className="progress-content">
                   <div className="progress-track" aria-label={formatPercent(torrent.percentDone)}>

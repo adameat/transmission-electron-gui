@@ -27,7 +27,12 @@ export function torrentTotalSize(torrent: Torrent): number {
   return totalSize > 0 ? totalSize : selectedSize;
 }
 
-const byteUnits = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+const byteUnits = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'] as const;
+type ByteUnit = (typeof byteUnits)[number];
+
+export function byteUnitIndexForUnit(unit: ByteUnit): number {
+  return byteUnits.indexOf(unit);
+}
 
 function clampByteUnitIndex(unitIndex: number): number {
   if (!Number.isFinite(unitIndex)) {
