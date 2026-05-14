@@ -736,10 +736,61 @@ select:disabled {
   overflow-wrap: anywhere;
 }
 
+.direct-download-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.direct-link-actions {
+  display: inline-grid;
+  grid-template-columns: 30px 30px minmax(70px, auto);
+  gap: 6px;
+  align-items: center;
+}
+
+.direct-link-action {
+  text-decoration: none;
+}
+
+.direct-link-action.copied {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+}
+
+.direct-link-action.failed {
+  border-color: var(--color-danger);
+  color: var(--color-danger-text);
+}
+
+.direct-copy-status {
+  min-width: 70px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.direct-copy-status.failed {
+  color: var(--color-danger-text);
+}
+
 .direct-download-table-wrap {
   min-height: 120px;
   border: 1px solid var(--color-line);
   border-radius: 6px;
+}
+
+.direct-download-table-wrap .subtable th:nth-child(2),
+.direct-download-table-wrap .subtable td:nth-child(2) {
+  width: 120px;
+  text-align: right;
+}
+
+.direct-download-table-wrap .subtable th:nth-child(3),
+.direct-download-table-wrap .subtable td:nth-child(3) {
+  width: 150px;
 }
 
 .files-table th:first-child,
