@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Check, Copy, ExternalLink } from 'lucide-react';
 import type { SessionStats, Torrent, TorrentFile, TorrentFileStat, TransmissionProfile, TransmissionSession } from '@shared/types';
 import { formatBytes, formatDate, formatDuration, formatPercent, formatRate, formatRatio, priorityLabel, statusText, torrentTotalSize } from '../utils';
 
@@ -35,6 +36,13 @@ interface DirectDownloadState {
   folderUrl: string | null;
   links: DirectDownloadLink[];
   message?: string;
+}
+
+type CopyResult = 'copied' | 'failed';
+
+interface CopyStatus {
+  key: string;
+  result: CopyResult;
 }
 
 function InfoGrid({ items }: { items: Array<[string, string]> }): JSX.Element {
@@ -116,6 +124,36 @@ function directDownloadUrl(rootUrl: string, ...paths: string[]): string | null {
     return url.href;
   } catch {
     return null;
+  }
+}
+
+async function copyTextToClipboard(text: string): Promise<void> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch {
+    // Packaged Electron can deny async clipboard access in some contexts, so keep a user-initiated DOM fallback.
+  }
+
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.setAttribute('readonly', 'true');
+  textArea.style.position = 'fixed';
+  textArea.style.left = '-9999px';
+  textArea.style.top = '-9999px';
+
+  document.body.append(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    if (!document.execCommand('copy')) {
+      throw new Error('Copy command failed');
+    }
+  } finally {
+    textArea.remove();
   }
 }
 
@@ -418,6 +456,31 @@ function StatsTab({ torrent, stats }: { torrent: Torrent; stats: SessionStats | 
 }
 
 function DirectDownloadTab({ state }: { state: DirectDownloadState }): JSX.Element {
+  const [copyStatus, setCopyStatus] = useState<CopyStatus | null>(null);
+  const copyScope = `${state.folderUrl ?? ''}\n${state.links.map((link) => link.url).join('\n')}`;
+
+  useEffect(() => {
+    setCopyStatus(null);
+  }, [copyScope]);
+
+  useEffect(() => {
+    if (!copyStatus) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => setCopyStatus(null), 2200);
+    return () => window.clearTimeout(timeoutId);
+  }, [copyStatus]);
+
+  const handleCopy = async (key: string, url: string): Promise<void> => {
+    try {
+      await copyTextToClipboard(url);
+      setCopyStatus({ key, result: 'copied' });
+    } catch {
+      setCopyStatus({ key, result: 'failed' });
+    }
+  };
+
   if (state.message) {
     return <div className="empty-state">{state.message}</div>;
   }
@@ -427,9 +490,12 @@ function DirectDownloadTab({ state }: { state: DirectDownloadState }): JSX.Eleme
       <div className="direct-download-panel">
         <h3>Download folder</h3>
         {state.folderUrl ? (
-          <a className="direct-download-link" href={state.folderUrl} target="_blank" rel="noreferrer" title={state.folderUrl}>
-            {state.folderPath}
-          </a>
+          <div className="direct-download-row">
+            <a className="direct-download-link" href={state.folderUrl} target="_blank" rel="noreferrer" title={state.folderUrl}>
+              {state.folderPath}
+            </a>
+            <DirectDownloadActions copyKey="folder" label="download folder" url={state.folderUrl} copyStatus={copyStatus} onCopy={handleCopy} />
+          </div>
         ) : null}
       </div>
 
@@ -449,9 +515,7 @@ function DirectDownloadTab({ state }: { state: DirectDownloadState }): JSX.Eleme
                   <td className="path-cell">{link.label}</td>
                   <td>{formatBytes(link.size)}</td>
                   <td>
-                    <a className="direct-download-link" href={link.url} target="_blank" rel="noreferrer" title={link.url}>
-                      Open
-                    </a>
+                    <DirectDownloadActions copyKey={link.url} label={link.label} url={link.url} copyStatus={copyStatus} onCopy={handleCopy} />
                   </td>
                 </tr>
               ))}
@@ -459,6 +523,44 @@ function DirectDownloadTab({ state }: { state: DirectDownloadState }): JSX.Eleme
           </table>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function DirectDownloadActions({
+  copyKey,
+  label,
+  url,
+  copyStatus,
+  onCopy
+}: {
+  copyKey: string;
+  label: string;
+  url: string;
+  copyStatus: CopyStatus | null;
+  onCopy: (key: string, url: string) => Promise<void>;
+}): JSX.Element {
+  const currentResult = copyStatus?.key === copyKey ? copyStatus.result : null;
+  const copied = currentResult === 'copied';
+  const failed = currentResult === 'failed';
+
+  return (
+    <div className="direct-link-actions">
+      <a className="icon-button direct-link-action" href={url} target="_blank" rel="noreferrer" title={`Open ${url}`} aria-label={`Open ${label}`}>
+        <ExternalLink size={15} aria-hidden="true" />
+      </a>
+      <button
+        type="button"
+        className={`icon-button direct-link-action${copied ? ' copied' : ''}${failed ? ' failed' : ''}`}
+        title={copied ? 'Copied' : failed ? 'Copy failed' : 'Copy link'}
+        aria-label={`Copy ${label} link`}
+        onClick={() => void onCopy(copyKey, url)}
+      >
+        {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+      </button>
+      <span className={`direct-copy-status${failed ? ' failed' : ''}`} aria-live="polite">
+        {copied ? 'Copied' : failed ? 'Copy failed' : ''}
+      </span>
     </div>
   );
 }
