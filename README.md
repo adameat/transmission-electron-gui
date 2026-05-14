@@ -18,48 +18,68 @@ The original Pascal/Lazarus Transmission Remote GUI project was used as workflow
 - Torrent grid with filters, search, progress, rates, ratio, ETA, peer count, sortable columns, and persisted column widths.
 - Toolbar actions for add, start, stop, remove, verify, reannounce, and refresh.
 - Add torrent dialog for magnet links, URLs, bare info hashes, and local `.torrent` files.
-- Detail tabs for general information, file wanted/priority controls, peers, trackers, and stats.
+- Detail tabs for general information, file wanted/priority controls, peers, trackers, stats, and configured direct download links.
+- App settings for interface theme and torrent list size-unit display.
+
+## Prerequisites
+
+- Node.js 22 or newer.
+- npm, which is bundled with Node.js.
+- Git for cloning and release tagging.
 
 ## Local Setup
 
 Install dependencies:
 
-```powershell
+```bash
 npm install
 ```
 
-On the current development machine, Git and Node.js were installed locally without admin privileges:
+On Windows PowerShell, if script execution policy blocks the `npm.ps1` shim, call `npm.cmd` instead:
+
+```powershell
+npm.cmd install
+```
+
+The optional helper scripts in this repository are Windows convenience wrappers for a local portable-tooling setup. They prepend these folders to `PATH` before invoking npm:
 
 - Git: `%LOCALAPPDATA%\Programs\MinGit`
 - Node.js: `%LOCALAPPDATA%\Programs\nodejs`
 
-In PowerShell on that machine, use `npm.cmd` instead of `npm` because script execution policy blocks the `npm.ps1` shim.
-
 ## Development
 
-The helper scripts prepend the local Node.js and MinGit folders to `PATH` before invoking npm:
+Run the Electron/Vite development app:
+
+```bash
+npm run dev
+```
+
+Build and type-check the app:
+
+```bash
+npm run build
+```
+
+Preview the production build:
+
+```bash
+npm run start
+```
+
+On the Windows portable-tooling setup described above, the wrapper scripts provide the same development and build commands:
 
 ```powershell
 .\dev.cmd
 .\build.cmd
 ```
 
-You can also run npm directly after opening a terminal with Node.js on `PATH`:
-
-```powershell
-npm.cmd install
-npm.cmd run dev
-npm.cmd run build
-npm.cmd run start
-```
-
 ## Build
 
-```powershell
-npm.cmd run build
+```bash
+npm run build
 ```
 
-## Windows Installer
+## Packages
 
 Build a Windows x64 installer with Electron Builder:
 
@@ -68,8 +88,6 @@ npm.cmd run dist:win
 ```
 
 The installer is written to `release/` and is intended to be published as a GitHub Release asset. The current installer is unsigned, so Windows may show an unknown-publisher warning.
-
-## macOS And Ubuntu Packages
 
 Build unsigned macOS packages on macOS:
 
@@ -87,7 +105,11 @@ npm run dist:linux
 
 This writes an x64 `.AppImage` and `.deb` package to `release/`.
 
-GitHub Actions builds Windows, macOS, and Ubuntu packages from `.github/workflows/release.yml`. Manual workflow runs upload build artifacts, and pushing a tag like `v0.1.1` publishes those artifacts to the matching GitHub Release.
+The supported release path builds Windows packages on Windows, macOS packages on macOS, and Linux packages on Linux.
+
+## Releases
+
+GitHub Actions builds Windows, macOS, and Ubuntu packages from `.github/workflows/release.yml`. Manual workflow runs upload build artifacts, and pushing a tag like `vX.Y.Z` publishes those artifacts to the matching GitHub Release.
 
 ## Notes
 

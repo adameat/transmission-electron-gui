@@ -1,6 +1,6 @@
 {
   "name": "transmission-electron-gui",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A modern Electron desktop GUI for Transmission daemon RPC.",
   "author": {
     "name": "adameat",
