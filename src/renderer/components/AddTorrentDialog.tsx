@@ -76,7 +76,6 @@ export function AddTorrentDialog({
   const downloadDirInputRef = useRef<HTMLInputElement | null>(null);
   const downloadDirListRef = useRef<HTMLDivElement | null>(null);
   const downloadDirOptionRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const deleteLocalTorrentFileCheckboxRef = useRef<HTMLInputElement | null>(null);
   const startNowCheckboxRef = useRef<HTMLInputElement | null>(null);
   const pendingDownloadDirFocusIndex = useRef<number | null>(null);
   const downloadDirListBoundsRef = useRef<DownloadDirListBounds | null>(null);
@@ -328,11 +327,7 @@ export function AddTorrentDialog({
       event.preventDefault();
       setDownloadDirPickerOpen(false);
       // The fixed-position list is rendered after the footer, so restore the dialog's visual tab order manually.
-      // The cleanup checkbox only exists for local file adds; otherwise the next visual control is Start torrent.
-      const nextControl = event.shiftKey
-        ? downloadDirInputRef.current
-        : (deleteLocalTorrentFileCheckboxRef.current ?? startNowCheckboxRef.current);
-      window.requestAnimationFrame(() => nextControl?.focus());
+      window.requestAnimationFrame(() => (event.shiftKey ? downloadDirInputRef.current : startNowCheckboxRef.current)?.focus());
       return;
     }
 
@@ -402,7 +397,22 @@ export function AddTorrentDialog({
             </div>
           </label>
 
-          {file ? <div className="selected-file">{file.path}</div> : null}
+          {file ? (
+            <div className="selected-file">
+              <div className="selected-file-path" title={file.path}>
+                {file.path}
+              </div>
+              <label className="selected-file-cleanup">
+                <input
+                  type="checkbox"
+                  checked={deleteLocalTorrentFileAfterAdd}
+                  onChange={(event) => setDeleteLocalTorrentFileAfterAdd(event.target.checked)}
+                  disabled={disabled}
+                />
+                Delete local .torrent file after adding
+              </label>
+            </div>
+          ) : null}
 
           <div ref={downloadDirFieldRef} className="stacked-field download-dir-field" onKeyDown={handleDownloadDirKeyDown}>
             <label htmlFor={downloadDirInputId}>Download folder</label>
@@ -434,18 +444,6 @@ export function AddTorrentDialog({
           </div>
 
           <div className="modal-options">
-            {file ? (
-              <label>
-                <input
-                  ref={deleteLocalTorrentFileCheckboxRef}
-                  type="checkbox"
-                  checked={deleteLocalTorrentFileAfterAdd}
-                  onChange={(event) => setDeleteLocalTorrentFileAfterAdd(event.target.checked)}
-                  disabled={disabled}
-                />
-                Delete local .torrent file after adding
-              </label>
-            ) : null}
             <label>
               <input
                 ref={startNowCheckboxRef}

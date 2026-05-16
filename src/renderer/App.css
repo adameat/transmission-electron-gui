@@ -1194,14 +1194,30 @@ select:disabled {
 }
 
 .selected-file {
-  overflow: hidden;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
   border: 1px solid var(--color-line);
   border-radius: 6px;
   padding: 7px 8px;
   background: var(--color-surface-raised);
   color: var(--color-text-muted);
+}
+
+.selected-file-path {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.selected-file-cleanup {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .modal-options {
@@ -1216,6 +1232,16 @@ select:disabled {
   color: var(--color-text);
   font-size: 12px;
   font-weight: 650;
+}
+
+.selected-file-cleanup input[type='checkbox'],
+.modal-options input[type='checkbox'] {
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
 }
 
 .form-error {
