@@ -775,12 +775,32 @@ export default function App(): JSX.Element {
       // When no folder is sent, Transmission applies the session default; remember that effective path instead of keeping an older custom default.
       rememberDownloadDir(payload.downloadDir || sessionDefaultDownloadDir || undefined);
 
+      let localTorrentFileDeleteError = '';
+      if (payload.deleteLocalTorrentFileAfterAdd && payload.localTorrentFilePath) {
+        try {
+          reportProgress('Deleting local torrent file...');
+          await transmissionApi().deleteOpenedTorrentFile(payload.localTorrentFilePath);
+        } catch (deleteError) {
+          localTorrentFileDeleteError = errorMessage(deleteError);
+        }
+      }
+
       try {
         reportProgress('Refreshing torrent list...');
         await refresh({ force: true, showProgress: true, label: 'Refresh after add' });
-        setMessage(`Added ${addedTorrent.name || 'torrent'}`);
+        const addedMessage = `Added ${addedTorrent.name || 'torrent'}`;
+        setMessage(
+          localTorrentFileDeleteError
+            ? `${addedMessage}, but deleting the local torrent file failed: ${localTorrentFileDeleteError}`
+            : addedMessage
+        );
       } catch (refreshError) {
-        setMessage(`Torrent added, but refresh failed: ${errorMessage(refreshError)}`);
+        const refreshMessage = `Torrent added, but refresh failed: ${errorMessage(refreshError)}`;
+        setMessage(
+          localTorrentFileDeleteError
+            ? `${refreshMessage}. Deleting the local torrent file also failed: ${localTorrentFileDeleteError}`
+            : refreshMessage
+        );
       }
     } catch (error) {
       setMessage(errorMessage(error));

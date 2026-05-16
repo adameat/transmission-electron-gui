@@ -23,6 +23,8 @@ const hidesWindowMenuBar = process.platform !== 'darwin';
 let mainWindow: BrowserWindow | null = null;
 let activeProfile: TransmissionProfile | null = null;
 let sessionId: string | null = null;
+// Renderer-requested cleanup is limited to file paths approved by the native open dialog in this main process.
+const openedTorrentFilePaths = new Set<string>();
 
 const defaultProfile: TransmissionProfile = {
   id: 'local-default',
@@ -305,13 +307,39 @@ async function openTorrentFile(): Promise<OpenedTorrentFile | null> {
     return null;
   }
 
-  const filePath = result.filePaths[0];
+  const filePath = path.resolve(result.filePaths[0]);
   const buffer = await fs.readFile(filePath);
+  // The app has a single Add Torrent dialog, so replacing the allow-list avoids keeping older selections deletable.
+  openedTorrentFilePaths.clear();
+  openedTorrentFilePaths.add(filePath);
   return {
     path: filePath,
     name: path.basename(filePath),
     metainfo: buffer.toString('base64')
   };
+}
+
+async function deleteOpenedTorrentFile(filePath: unknown): Promise<boolean> {
+  if (typeof filePath !== 'string' || !filePath.trim()) {
+    throw new Error('Torrent file path is required.');
+  }
+
+  const resolvedFilePath = path.resolve(filePath);
+  // Limit deletion to files selected through this process' open dialog so renderer code cannot remove arbitrary paths.
+  if (!openedTorrentFilePaths.has(resolvedFilePath)) {
+    throw new Error('Only torrent files selected in this app can be deleted.');
+  }
+
+  try {
+    await fs.unlink(resolvedFilePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  openedTorrentFilePaths.delete(resolvedFilePath);
+  return true;
 }
 
 function createWindow(): void {
@@ -387,6 +415,9 @@ function registerIpc(): void {
   });
   ipcMain.handle('rpc:request', (_event, request: RpcRequest) => sendRpc(request));
   ipcMain.handle('dialog:openTorrentFile', () => openTorrentFile());
+  ipcMain.handle('file:deleteOpenedTorrentFile', (_event, filePath: unknown) => {
+    return deleteOpenedTorrentFile(filePath);
+  });
 }
 
 app.whenReady().then(() => {

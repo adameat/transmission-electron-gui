@@ -7,6 +7,8 @@ export interface AddTorrentPayload {
   filename?: string;
   metainfo?: string;
   downloadDir?: string;
+  localTorrentFilePath?: string;
+  deleteLocalTorrentFileAfterAdd?: boolean;
   paused: boolean;
 }
 
@@ -64,6 +66,7 @@ export function AddTorrentDialog({
   const [downloadDir, setDownloadDir] = useState(defaultDownloadDir);
   const [downloadDirPickerOpen, setDownloadDirPickerOpen] = useState(false);
   const [startNow, setStartNow] = useState(true);
+  const [deleteLocalTorrentFileAfterAdd, setDeleteLocalTorrentFileAfterAdd] = useState(true);
   const [file, setFile] = useState<OpenedTorrentFile | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState('');
@@ -73,6 +76,7 @@ export function AddTorrentDialog({
   const downloadDirInputRef = useRef<HTMLInputElement | null>(null);
   const downloadDirListRef = useRef<HTMLDivElement | null>(null);
   const downloadDirOptionRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const deleteLocalTorrentFileCheckboxRef = useRef<HTMLInputElement | null>(null);
   const startNowCheckboxRef = useRef<HTMLInputElement | null>(null);
   const pendingDownloadDirFocusIndex = useRef<number | null>(null);
   const downloadDirListBoundsRef = useRef<DownloadDirListBounds | null>(null);
@@ -86,6 +90,7 @@ export function AddTorrentDialog({
       setDownloadDir(defaultDownloadDir);
       setDownloadDirPickerOpen(false);
       setStartNow(true);
+      setDeleteLocalTorrentFileAfterAdd(true);
       setFile(null);
       setSubmitting(false);
       setProgress('');
@@ -171,6 +176,7 @@ export function AddTorrentDialog({
     if (openedFile) {
       setFile(openedFile);
       setSource(openedFile.name);
+      setDeleteLocalTorrentFileAfterAdd(true);
       setError('');
     }
   }
@@ -192,6 +198,8 @@ export function AddTorrentDialog({
           filename: file?.metainfo ? undefined : normalizedSource,
           metainfo: file?.metainfo,
           downloadDir: downloadDir.trim() || undefined,
+          localTorrentFilePath: file?.path,
+          deleteLocalTorrentFileAfterAdd: Boolean(file && deleteLocalTorrentFileAfterAdd),
           paused: !startNow
         },
         setProgress
@@ -320,7 +328,11 @@ export function AddTorrentDialog({
       event.preventDefault();
       setDownloadDirPickerOpen(false);
       // The fixed-position list is rendered after the footer, so restore the dialog's visual tab order manually.
-      window.requestAnimationFrame(() => (event.shiftKey ? downloadDirInputRef.current : startNowCheckboxRef.current)?.focus());
+      // The cleanup checkbox only exists for local file adds; otherwise the next visual control is Start torrent.
+      const nextControl = event.shiftKey
+        ? downloadDirInputRef.current
+        : (deleteLocalTorrentFileCheckboxRef.current ?? startNowCheckboxRef.current);
+      window.requestAnimationFrame(() => nextControl?.focus());
       return;
     }
 
@@ -422,6 +434,18 @@ export function AddTorrentDialog({
           </div>
 
           <div className="modal-options">
+            {file ? (
+              <label>
+                <input
+                  ref={deleteLocalTorrentFileCheckboxRef}
+                  type="checkbox"
+                  checked={deleteLocalTorrentFileAfterAdd}
+                  onChange={(event) => setDeleteLocalTorrentFileAfterAdd(event.target.checked)}
+                  disabled={disabled}
+                />
+                Delete local .torrent file after adding
+              </label>
+            ) : null}
             <label>
               <input
                 ref={startNowCheckboxRef}
