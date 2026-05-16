@@ -11,6 +11,7 @@ declare global {
       disconnect: () => Promise<boolean>;
       request: <TArguments = Record<string, unknown>>(request: RpcRequest) => Promise<TArguments>;
       openTorrentFile: () => Promise<OpenedTorrentFile | null>;
+      deleteOpenedTorrentFile: (filePath: string) => Promise<boolean>;
     };
   }
 }

@@ -7,6 +7,8 @@ export interface AddTorrentPayload {
   filename?: string;
   metainfo?: string;
   downloadDir?: string;
+  localTorrentFilePath?: string;
+  deleteLocalTorrentFileAfterAdd?: boolean;
   paused: boolean;
 }
 
@@ -64,6 +66,7 @@ export function AddTorrentDialog({
   const [downloadDir, setDownloadDir] = useState(defaultDownloadDir);
   const [downloadDirPickerOpen, setDownloadDirPickerOpen] = useState(false);
   const [startNow, setStartNow] = useState(true);
+  const [deleteLocalTorrentFileAfterAdd, setDeleteLocalTorrentFileAfterAdd] = useState(true);
   const [file, setFile] = useState<OpenedTorrentFile | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState('');
@@ -86,6 +89,7 @@ export function AddTorrentDialog({
       setDownloadDir(defaultDownloadDir);
       setDownloadDirPickerOpen(false);
       setStartNow(true);
+      setDeleteLocalTorrentFileAfterAdd(true);
       setFile(null);
       setSubmitting(false);
       setProgress('');
@@ -171,6 +175,7 @@ export function AddTorrentDialog({
     if (openedFile) {
       setFile(openedFile);
       setSource(openedFile.name);
+      setDeleteLocalTorrentFileAfterAdd(true);
       setError('');
     }
   }
@@ -192,6 +197,8 @@ export function AddTorrentDialog({
           filename: file?.metainfo ? undefined : normalizedSource,
           metainfo: file?.metainfo,
           downloadDir: downloadDir.trim() || undefined,
+          localTorrentFilePath: file?.path,
+          deleteLocalTorrentFileAfterAdd: Boolean(file && deleteLocalTorrentFileAfterAdd),
           paused: !startNow
         },
         setProgress
@@ -390,7 +397,22 @@ export function AddTorrentDialog({
             </div>
           </label>
 
-          {file ? <div className="selected-file">{file.path}</div> : null}
+          {file ? (
+            <div className="selected-file">
+              <div className="selected-file-path" title={file.path}>
+                {file.path}
+              </div>
+              <label className="selected-file-cleanup">
+                <input
+                  type="checkbox"
+                  checked={deleteLocalTorrentFileAfterAdd}
+                  onChange={(event) => setDeleteLocalTorrentFileAfterAdd(event.target.checked)}
+                  disabled={disabled}
+                />
+                Delete local .torrent file after adding
+              </label>
+            </div>
+          ) : null}
 
           <div ref={downloadDirFieldRef} className="stacked-field download-dir-field" onKeyDown={handleDownloadDirKeyDown}>
             <label htmlFor={downloadDirInputId}>Download folder</label>
