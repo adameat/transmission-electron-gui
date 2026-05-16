@@ -157,22 +157,31 @@ function* downloadDirSuggestionSources(
   recentDownloadDirs: string[],
   torrents: Torrent[],
   sessionDefaultDownloadDir: string
-): Generator<string | undefined> {
+): Generator<string> {
   yield defaultDownloadDir;
-  yield* recentDownloadDirs;
+  yield sessionDefaultDownloadDir;
 
-  // Recent folders are the high-confidence source; current torrents are a fallback, so cap the scan to keep render work predictable.
-  let scannedTorrents = 0;
-  for (const torrent of torrents) {
-    if (scannedTorrents >= maxTorrentDownloadDirSuggestionScan) {
-      break;
-    }
+  // RPC order is not a useful recency signal; sort fallback torrents before capping so old torrents cannot evict newer folders.
+  const fallbackTorrents = [...torrents]
+    .sort((firstTorrent, secondTorrent) => {
+      const recencyComparison = torrentDownloadDirRecency(secondTorrent) - torrentDownloadDirRecency(firstTorrent);
+      return recencyComparison !== 0 ? recencyComparison : secondTorrent.id - firstTorrent.id;
+    })
+    .slice(0, maxTorrentDownloadDirSuggestionScan);
 
-    scannedTorrents += 1;
+  for (const torrent of fallbackTorrents) {
     yield torrent.downloadDir;
   }
 
-  yield sessionDefaultDownloadDir;
+  yield* recentDownloadDirs;
+}
+
+function torrentDownloadDirRecency(torrent: Torrent): number {
+  return torrent.addedDate || torrent.doneDate || torrent.activityDate || 0;
+}
+
+function sortDownloadDirSuggestions(downloadDirs: string[]): string[] {
+  return [...downloadDirs].sort((firstDownloadDir, secondDownloadDir) => collator.compare(firstDownloadDir, secondDownloadDir));
 }
 
 function sameDownloadDirs(firstDownloadDirs: string[], secondDownloadDirs: string[]): boolean {
@@ -476,15 +485,19 @@ export default function App(): JSX.Element {
   );
   const downloadDirSuggestions = useMemo(
     () => {
+      if (!addOpen) {
+        return [];
+      }
+
       const downloadDirSources = downloadDirSuggestionSources(
         defaultAddDownloadDir,
         settings.recentDownloadDirs ?? [],
         torrents,
         sessionDefaultDownloadDir
       );
-      return collectDownloadDirs(downloadDirSources);
+      return sortDownloadDirSuggestions(collectDownloadDirs(downloadDirSources));
     },
-    [defaultAddDownloadDir, settings.recentDownloadDirs, sessionDefaultDownloadDir, torrents]
+    [addOpen, defaultAddDownloadDir, settings.recentDownloadDirs, sessionDefaultDownloadDir, torrents]
   );
 
   function changeSort(sortKey: TorrentSortKey): void {
