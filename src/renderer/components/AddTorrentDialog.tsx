@@ -407,8 +407,8 @@ export function AddTorrentDialog({
                 <button
                   type="button"
                   className="icon-button download-dir-toggle"
-                  title="Recent folders"
-                  aria-label="Recent download folders"
+                  title="Download folder suggestions"
+                  aria-label="Download folder suggestions"
                   aria-haspopup="listbox"
                   aria-expanded={downloadDirPickerOpen}
                   aria-controls={downloadDirPickerOpen && hasDownloadDirSuggestions ? downloadDirListId : undefined}
@@ -453,7 +453,7 @@ export function AddTorrentDialog({
             ref={downloadDirListRef}
             className="download-dir-list"
             role="listbox"
-            aria-label="Recent download folders"
+            aria-label="Download folder suggestions"
             style={downloadDirListBounds ?? undefined}
             onKeyDown={handleDownloadDirKeyDown}
           >

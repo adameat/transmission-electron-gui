@@ -1,6 +1,6 @@
 // The Add Torrent picker is scrollable, so keep a useful history without letting settings grow without bound.
 export const maxRecentDownloadDirs = 32;
-// Current torrents are only a fallback source for suggestions, so cap the scan to keep refresh-driven renders bounded on huge libraries.
+// Current torrents are only a fallback source for suggestions, so cap how many can contribute folders on huge libraries.
 export const maxTorrentDownloadDirSuggestionScan = 500;
 
 export function collectDownloadDirs(downloadDirs: Iterable<unknown>, maxDownloadDirs = maxRecentDownloadDirs): string[] {
