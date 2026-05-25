@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import type { SessionStats, Torrent, TorrentFile, TorrentFileStat, TransmissionProfile, TransmissionSession } from '@shared/types';
 import { formatBytes, formatDate, formatDuration, formatPercent, formatRate, formatRatio, priorityLabel, statusText, torrentTotalSize } from '../utils';
@@ -335,15 +335,24 @@ function FilesTab({
 }): JSX.Element {
   const files = torrent.files ?? [];
   const fileStats = torrent.fileStats ?? [];
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
   const resolvedColumns = fileColumns.map((column) => ({
     ...column,
     width: Math.max(column.minWidth, columnWidths[column.key] ?? column.width)
   }));
   const tableWidth = resolvedColumns.reduce((totalWidth, column) => totalWidth + column.width, 0);
 
+  useEffect(() => () => {
+    resizeCleanupRef.current?.();
+    resizeCleanupRef.current = null;
+    document.body.classList.remove('is-resizing-column');
+  }, []);
+
   function startResize(event: ReactMouseEvent, columnKey: FileColumnKey, startWidth: number, minWidth: number): void {
     event.preventDefault();
     event.stopPropagation();
+    resizeCleanupRef.current?.();
+    resizeCleanupRef.current = null;
 
     const startX = event.clientX;
 
@@ -355,16 +364,22 @@ function FilesTab({
       onColumnResize(columnKey, nextWidth(moveEvent.clientX));
     }
 
-    function handleMouseUp(upEvent: MouseEvent): void {
+    function cleanup(): void {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
       document.body.classList.remove('is-resizing-column');
+      resizeCleanupRef.current = null;
+    }
+
+    function handleMouseUp(upEvent: MouseEvent): void {
+      cleanup();
       onColumnResize(columnKey, nextWidth(upEvent.clientX));
     }
 
     document.body.classList.add('is-resizing-column');
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+    resizeCleanupRef.current = cleanup;
   }
 
   return (
