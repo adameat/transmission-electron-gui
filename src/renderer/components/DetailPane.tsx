@@ -342,17 +342,22 @@ function FilesTab({
   }));
   const tableWidth = resolvedColumns.reduce((totalWidth, column) => totalWidth + column.width, 0);
 
-  useEffect(() => () => {
+  function stopActiveResize(): void {
     resizeCleanupRef.current?.();
     resizeCleanupRef.current = null;
+  }
+
+  function stopActiveResizeOnUnmount(): void {
+    stopActiveResize();
     document.body.classList.remove('is-resizing-column');
-  }, []);
+  }
+
+  useEffect(() => stopActiveResizeOnUnmount, []);
 
   function startResize(event: ReactMouseEvent, columnKey: FileColumnKey, startWidth: number, minWidth: number): void {
     event.preventDefault();
     event.stopPropagation();
-    resizeCleanupRef.current?.();
-    resizeCleanupRef.current = null;
+    stopActiveResize();
 
     const startX = event.clientX;
 
