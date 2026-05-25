@@ -430,6 +430,11 @@ select:disabled {
   padding-right: 12px;
 }
 
+.files-table th {
+  overflow: visible;
+  padding-right: 12px;
+}
+
 .column-sort {
   display: grid;
   grid-template-columns: minmax(0, max-content) 12px;
@@ -479,6 +484,26 @@ select:disabled {
   right: 0;
 }
 
+.files-table th.align-right .files-column-label {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.files-table th.align-center .files-column-label {
+  justify-content: center;
+  text-align: center;
+}
+
+.files-column-label {
+  display: flex;
+  width: 100%;
+  min-height: 22px;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sort-indicator {
   display: inline-grid;
   width: 12px;
@@ -499,6 +524,10 @@ select:disabled {
 
 /* The final handle must stay inside the scroll container, otherwise its hit area creates a tiny permanent horizontal overflow. */
 .torrent-table th:last-child .column-resizer {
+  right: 0;
+}
+
+.files-table th:last-child .column-resizer {
   right: 0;
 }
 
@@ -558,7 +587,8 @@ select:disabled {
 }
 
 .torrent-table td.number-cell,
-.torrent-table td.date-cell {
+.torrent-table td.date-cell,
+.subtable td.number-cell {
   overflow: hidden;
   text-align: right;
   text-overflow: ellipsis;
@@ -569,7 +599,8 @@ select:disabled {
   white-space: nowrap;
 }
 
-.torrent-table td.done-cell {
+.torrent-table td.done-cell,
+.files-table td.done-cell {
   overflow: hidden;
   text-align: center;
   text-overflow: ellipsis;
@@ -795,8 +826,11 @@ select:disabled {
 
 .files-table th:first-child,
 .files-table td:first-child {
-  width: 84px;
   text-align: center;
+}
+
+.files-table .path-cell {
+  max-width: none;
 }
 
 .empty-state {

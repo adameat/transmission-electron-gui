@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import type { SessionStats, Torrent, TorrentFile, TorrentFileStat, TransmissionProfile, TransmissionSession } from '@shared/types';
 import { formatBytes, formatDate, formatDuration, formatPercent, formatRate, formatRatio, priorityLabel, statusText, torrentTotalSize } from '../utils';
@@ -23,6 +23,17 @@ const baseTabs: Array<{ id: DetailTab; label: string }> = [
   { id: 'peers', label: 'Peers' },
   { id: 'trackers', label: 'Trackers' },
   { id: 'stats', label: 'Stats' }
+];
+
+type FileColumnKey = 'download' | 'name' | 'size' | 'done' | 'priority';
+type FileColumnWidths = Partial<Record<FileColumnKey, number>>;
+
+const fileColumns: Array<{ key: FileColumnKey; label: string; width: number; minWidth: number; align?: 'center' | 'right' }> = [
+  { key: 'download', label: 'Download', width: 86, minWidth: 74, align: 'center' },
+  { key: 'name', label: 'Name', width: 440, minWidth: 220 },
+  { key: 'size', label: 'Size', width: 112, minWidth: 86, align: 'right' },
+  { key: 'done', label: 'Done', width: 220, minWidth: 150, align: 'center' },
+  { key: 'priority', label: 'Priority', width: 170, minWidth: 130 }
 ];
 
 interface DirectDownloadLink {
@@ -58,9 +69,18 @@ function InfoGrid({ items }: { items: Array<[string, string]> }): JSX.Element {
   );
 }
 
-function fileProgress(file: TorrentFile, stat?: TorrentFileStat): string {
+function classNames(...names: Array<string | undefined | false>): string | undefined {
+  const filteredNames = names.filter(Boolean);
+  return filteredNames.length > 0 ? filteredNames.join(' ') : undefined;
+}
+
+function fileProgressRatio(file: TorrentFile, stat?: TorrentFileStat): number {
   const completed = stat?.bytesCompleted ?? file.bytesCompleted ?? 0;
-  return file.length > 0 ? formatPercent(completed / file.length) : '0.0%';
+  return file.length > 0 ? Math.max(0, Math.min(1, completed / file.length)) : 0;
+}
+
+function fileProgress(file: TorrentFile, stat?: TorrentFileStat): string {
+  return formatPercent(fileProgressRatio(file, stat));
 }
 
 function normalizeServerPath(value: string): string {
@@ -213,9 +233,14 @@ export function DetailPane({
   onFileWantedChange,
   onFilePriorityChange
 }: DetailPaneProps): JSX.Element {
+  const [fileColumnWidths, setFileColumnWidths] = useState<FileColumnWidths>({});
   const directDownloadState = torrent ? buildDirectDownloadState(torrent, profile) : null;
   const tabs = directDownloadState ? [...baseTabs, { id: 'direct' as const, label: 'Download' }] : baseTabs;
   const activeDetailTab = tabs.some((tab) => tab.id === activeTab) ? activeTab : 'general';
+
+  function resizeFileColumn(columnKey: FileColumnKey, width: number): void {
+    setFileColumnWidths((currentWidths) => ({ ...currentWidths, [columnKey]: width }));
+  }
 
   useEffect(() => {
     if (activeDetailTab !== activeTab) {
@@ -240,6 +265,8 @@ export function DetailPane({
           <FilesTab
             torrent={torrent}
             busy={busy}
+            columnWidths={fileColumnWidths}
+            onColumnResize={resizeFileColumn}
             onFileWantedChange={onFileWantedChange}
             onFilePriorityChange={onFilePriorityChange}
           />
@@ -294,33 +321,101 @@ function GeneralTab({ torrent, session }: { torrent: Torrent; session: Transmiss
 function FilesTab({
   torrent,
   busy,
+  columnWidths,
+  onColumnResize,
   onFileWantedChange,
   onFilePriorityChange
 }: {
   torrent: Torrent;
   busy: boolean;
+  columnWidths: FileColumnWidths;
+  onColumnResize: (columnKey: FileColumnKey, width: number) => void;
   onFileWantedChange: (fileIndex: number, wanted: boolean) => void;
   onFilePriorityChange: (fileIndex: number, priority: -1 | 0 | 1) => void;
 }): JSX.Element {
   const files = torrent.files ?? [];
   const fileStats = torrent.fileStats ?? [];
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
+  const resolvedColumns = fileColumns.map((column) => ({
+    ...column,
+    width: Math.max(column.minWidth, columnWidths[column.key] ?? column.width)
+  }));
+  const tableWidth = resolvedColumns.reduce((totalWidth, column) => totalWidth + column.width, 0);
+
+  function stopActiveResize(): void {
+    resizeCleanupRef.current?.();
+    resizeCleanupRef.current = null;
+  }
+
+  function stopActiveResizeOnUnmount(): void {
+    stopActiveResize();
+    document.body.classList.remove('is-resizing-column');
+  }
+
+  useEffect(() => stopActiveResizeOnUnmount, []);
+
+  function startResize(event: ReactMouseEvent, columnKey: FileColumnKey, startWidth: number, minWidth: number): void {
+    event.preventDefault();
+    event.stopPropagation();
+    stopActiveResize();
+
+    const startX = event.clientX;
+
+    function nextWidth(clientX: number): number {
+      return Math.max(minWidth, Math.round(startWidth + clientX - startX));
+    }
+
+    function handleMouseMove(moveEvent: MouseEvent): void {
+      onColumnResize(columnKey, nextWidth(moveEvent.clientX));
+    }
+
+    function cleanup(): void {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.classList.remove('is-resizing-column');
+      resizeCleanupRef.current = null;
+    }
+
+    function handleMouseUp(upEvent: MouseEvent): void {
+      cleanup();
+      onColumnResize(columnKey, nextWidth(upEvent.clientX));
+    }
+
+    document.body.classList.add('is-resizing-column');
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    resizeCleanupRef.current = cleanup;
+  }
 
   return (
     <div className="subtable-wrap">
-      <table className="subtable files-table">
+      <table className="subtable files-table" style={{ width: `max(100%, ${tableWidth}px)` }}>
+        <colgroup>
+          {resolvedColumns.map((column) => (
+            <col key={column.key} style={{ width: `${column.width}px` }} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
-            <th>Download</th>
-            <th>Name</th>
-            <th>Size</th>
-            <th>Done</th>
-            <th>Priority</th>
+            {resolvedColumns.map((column) => (
+              <th key={column.key} className={classNames(column.align === 'right' && 'align-right', column.align === 'center' && 'align-center')}>
+                <span className="files-column-label">{column.label}</span>
+                <span
+                  className="column-resizer"
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label={`Resize ${column.label} column`}
+                  onMouseDown={(event) => startResize(event, column.key, column.width, column.minWidth)}
+                />
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {files.map((file, fileIndex) => {
             const stat = fileStats[fileIndex];
             const priority = stat?.priority ?? 0;
+            const progress = fileProgress(file, stat);
             return (
               <tr key={`${file.name}-${fileIndex}`}>
                 <td>
@@ -332,9 +427,16 @@ function FilesTab({
                     aria-label={`Download ${file.name}`}
                   />
                 </td>
-                <td className="path-cell">{file.name}</td>
-                <td>{formatBytes(file.length)}</td>
-                <td>{fileProgress(file, stat)}</td>
+                <td className="path-cell" title={file.name}>{file.name}</td>
+                <td className="number-cell">{formatBytes(file.length)}</td>
+                <td className="progress-cell done-cell">
+                  <div className="progress-content">
+                    <div className="progress-track" aria-label={progress}>
+                      <span style={{ width: progress }} />
+                    </div>
+                    <em>{progress}</em>
+                  </div>
+                </td>
                 <td>
                   <select
                     value={priority}
